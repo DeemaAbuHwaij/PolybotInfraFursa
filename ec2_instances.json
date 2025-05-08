@@ -1,5 +1,5 @@
 {
   "bastion_instance_public_ip": "18.144.5.190",
-  "polybot_instance_private_ip": "10.0.1.164",
+  "polybot_instance_private_ip": "10.0.0.50",
   "yolo_instance_private_ip": "10.0.2.201"
 }
