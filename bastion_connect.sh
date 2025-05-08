@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 if [ -z "$KEY_PATH" ]; then
@@ -16,14 +15,15 @@ if [ -z "$2" ]; then
   exit 5
 fi
 
-if [ -z "$3" ]; then
+if [ $# -lt 3 ]; then
   echo "Please provide a command to run on the target"
   exit 5
 fi
 
 BASTION_IP="$1"
 TARGET_PRIVATE_IP="$2"
-COMMAND="$3"
+shift 2
 
-# Run command on the target via bastion
-ssh -i "$KEY_PATH" ubuntu@"$TARGET_PRIVATE_IP" "$COMMAND"
+ssh -i "$KEY_PATH" -o StrictHostKeyChecking=no \
+  -o ProxyCommand="ssh -i $KEY_PATH -o StrictHostKeyChecking=no -W %h:%p ubuntu@$BASTION_IP" \
+  ubuntu@"$TARGET_PRIVATE_IP" "$@"
