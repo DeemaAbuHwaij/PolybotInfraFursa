@@ -15,3 +15,5 @@ TARGET_PRIVATE_IP=10.0.0.50      # Polybot private IP
 
 # SSH into the target instance via the Bastion host
 ssh -i "$KEY_PATH" -o ProxyCommand="ssh -i $KEY_PATH -W %h:%p $BASTION_USER@$BASTION_IP" $TARGET_USER@$TARGET_PRIVATE_IP
+
+
