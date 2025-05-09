@@ -22,8 +22,10 @@ fi
 
 BASTION_IP="$1"
 TARGET_PRIVATE_IP="$2"
-shift 2  # This removes the first two arguments
-COMMAND="$@"  # This captures everything else as the command
+shift 2
+COMMAND="$@"
 
-# Execute command on target instance through the bastion
-ssh -i "$KEY_PATH" -o ProxyCommand="ssh -i $KEY_PATH -W %h:%p ubuntu@$BASTION_IP" ubuntu@$TARGET_PRIVATE_IP "$COMMAND"
+ssh -i "$KEY_PATH" \
+    -o StrictHostKeyChecking=no \
+    -o ProxyCommand="ssh -i $KEY_PATH -o StrictHostKeyChecking=no -W %h:%p ubuntu@$BASTION_IP" \
+    ubuntu@$TARGET_PRIVATE_IP "$COMMAND"
