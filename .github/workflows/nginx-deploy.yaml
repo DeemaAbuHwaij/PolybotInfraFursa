@@ -1,0 +1,31 @@
+name: Deploy Nginx Config
+
+on:
+  push:
+    paths:
+      - "nginx-config/**"
+    branches:
+      - feature/nginx
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up SSH key
+      run: |
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > key.pem
+        chmod 600 key.pem
+
+    - name: Copy Nginx config files to EC2
+      run: |
+        scp -i key.pem -o StrictHostKeyChecking=no \
+        -r nginx-config/*.conf ubuntu@${{ secrets.NGINX_HOST }}:/tmp/
+
+        ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.NGINX_HOST }} << 'EOF'
+          sudo mv /tmp/*.conf /etc/nginx/conf.d/
+          sudo nginx -t && sudo systemctl reload nginx
+        EOF
