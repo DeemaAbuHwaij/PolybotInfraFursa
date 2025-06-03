@@ -3,7 +3,7 @@ name: Deploy Nginx Config to Prod
 on:
   push:
     paths:
-      - "nginx-config/prod.conf"
+      - "nginx-config/polybot-prod.conf"
     branches:
       - main
 
@@ -22,9 +22,9 @@ jobs:
 
     - name: Copy Nginx config file to Prod EC2
       run: |
-        scp -i key.pem -o StrictHostKeyChecking=no nginx-config/prod.conf ubuntu@${{ secrets.PROD_HOST }}:/tmp/
+        scp -i key.pem -o StrictHostKeyChecking=no nginx-config/polybot-prod.conf ubuntu@${{ secrets.PROD_HOST }}:/tmp/
         
         ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.PROD_HOST }} << 'EOF'
-          sudo mv /tmp/prod.conf /etc/nginx/conf.d/
+          sudo mv /tmp/polybot-prod.conf /etc/nginx/conf.d/
           sudo nginx -t && sudo systemctl reload nginx
         EOF

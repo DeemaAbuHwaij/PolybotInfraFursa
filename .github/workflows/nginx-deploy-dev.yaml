@@ -3,7 +3,7 @@ name: Deploy Nginx Config to Dev
 on:
   push:
     paths:
-      - "nginx-config/default.conf"
+      - "nginx-config/polybot-dev.conf"
     branches:
       - dev
 
@@ -22,9 +22,9 @@ jobs:
 
     - name: Copy Nginx config file to Dev EC2
       run: |
-        scp -i key.pem -o StrictHostKeyChecking=no nginx-config/default.conf ubuntu@${{ secrets.DEV_HOST }}:/tmp/
+        scp -i key.pem -o StrictHostKeyChecking=no nginx-config/polybot-dev.conf ubuntu@${{ secrets.DEV_HOST }}:/tmp/
         
         ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.DEV_HOST }} << 'EOF'
-          sudo mv /tmp/default.conf /etc/nginx/conf.d/
+          sudo mv /tmp/polybot-dev.conf /etc/nginx/conf.d/
           sudo nginx -t && sudo systemctl reload nginx
         EOF
