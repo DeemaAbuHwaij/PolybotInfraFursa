@@ -41,7 +41,7 @@ resource "aws_instance" "control_plane" {
 }
 
 resource "aws_launch_template" "worker" {
-  name_prefix   = "k8s-worker-"
+  name_prefix   = "deema-k8s-worker-"
   image_id      = var.ami_id
   instance_type = var.worker_instance_type
   key_name      = var.key_name
@@ -53,7 +53,7 @@ resource "aws_launch_template" "worker" {
   tag_specifications {
     resource_type = "instance"
     tags = {
-      Name = "k8s-worker"
+      Name = "deema-k8s-worker"
     }
   }
 }
@@ -71,7 +71,7 @@ resource "aws_autoscaling_group" "worker_asg" {
 
   tag {
     key                 = "Name"
-    value               = "k8s-worker"
+    value               = "deema-k8s-worker"
     propagate_at_launch = true
   }
 
@@ -79,4 +79,3 @@ resource "aws_autoscaling_group" "worker_asg" {
     create_before_destroy = true
   }
 }
-
