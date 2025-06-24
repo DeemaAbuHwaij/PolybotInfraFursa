@@ -13,12 +13,10 @@ curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip
 unzip -q awscliv2.zip
 sudo ./aws/install
 
-# Enable IPv4 forwarding (persists across reboots)
+# Enable IPv4 forwarding
 cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
 net.ipv4.ip_forward = 1
 EOF
-
-# Apply immediately
 sudo sysctl --system
 
 # Add Kubernetes and CRI-O repositories
@@ -37,16 +35,16 @@ sudo apt-get update
 sudo apt-get install -y cri-o kubelet kubeadm kubectl
 sudo apt-mark hold kubelet kubeadm kubectl
 
-# Start and enable CRI-O and kubelet
+# Start CRI-O but delay kubelet
 sudo systemctl start crio.service
 sudo systemctl enable --now crio.service
-sudo systemctl enable --now kubelet
+sudo systemctl disable --now kubelet  # will be started after join
 
-# Disable swap
+# Disable swap permanently
 sudo swapoff -a
-(crontab -l ; echo "@reboot /sbin/swapoff -a") | crontab -
+(crontab -l 2>/dev/null; echo "@reboot /sbin/swapoff -a") | crontab -
 
-# 🧠 Create the join script (runs only once if node is not already joined)
+# 🧠 Create the kubeadm join script
 cat <<'EOF' | sudo tee /opt/k8s-join.sh
 #!/bin/bash
 set -e
@@ -55,6 +53,10 @@ if [ -f /etc/kubernetes/kubelet.conf ]; then
   echo "✅ Already part of the cluster. Skipping join."
   exit 0
 fi
+
+echo "🧹 Cleaning up any old cluster config..."
+sudo kubeadm reset -f
+sudo rm -rf /etc/cni /var/lib/cni /var/lib/kubelet /etc/kubernetes
 
 for i in {1..10}; do
   if command -v aws &>/dev/null; then break; fi
@@ -76,12 +78,14 @@ fi
 FINAL_CMD="$JOIN_CMD --cri-socket unix:///var/run/containerd/containerd.sock"
 echo "🚀 Running join command..."
 eval "$FINAL_CMD"
+
+# ✅ Start kubelet now that config.yaml exists
+sudo systemctl start kubelet
 EOF
 
-# Make join script executable
 sudo chmod +x /opt/k8s-join.sh
 
-# 🧩 Create systemd unit to run join script at startup
+# 🧩 Create a systemd service to auto-join on startup
 cat <<EOF | sudo tee /etc/systemd/system/k8s-join.service
 [Unit]
 Description=Kubernetes Worker Auto Join
@@ -96,7 +100,7 @@ RemainAfterExit=true
 WantedBy=multi-user.target
 EOF
 
-# Enable the service
+# Enable and reload systemd units
 sudo systemctl daemon-reexec
 sudo systemctl daemon-reload
 sudo systemctl enable k8s-join.service
