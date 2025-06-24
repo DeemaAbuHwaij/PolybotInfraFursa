@@ -66,10 +66,18 @@ resource "aws_iam_role_policy" "control_plane_policy" {
 }
 
 # ✅ Instance profile to attach IAM role to EC2
+
 resource "aws_iam_instance_profile" "control_plane_profile" {
+  count = var.use_existing_iam ? 0 : 1
+
   name = "k8s-control-plane-instance-profile"
   role = aws_iam_role.control_plane_role.name
 }
+
+locals {
+  control_plane_profile_name = var.use_existing_iam ? "k8s-control-plane-instance-profile" : aws_iam_instance_profile.control_plane_profile[0].name
+}
+
 
 # ✅ Control plane EC2 instance with IAM profile
 resource "aws_instance" "control_plane" {
@@ -80,7 +88,8 @@ resource "aws_instance" "control_plane" {
   vpc_security_group_ids      = [aws_security_group.k8s_sg.id]
   user_data                   = file("${path.module}/user_data_control_plane.sh")
   user_data_replace_on_change = true
-  iam_instance_profile        = aws_iam_instance_profile.control_plane_profile.name # ✅
+  iam_instance_profile        = local.control_plane_profile_name # ✅
+
 
   tags = {
     Name = "deema-task-k8s-control-plane"

@@ -10,3 +10,4 @@ desired_capacity    = 2
 min_size            = 1
 max_size            = 3
 worker_subnet_ids   = ["subnet-00b178dd39291db6a"]  # ✅ You can add more subnets if needed
+use_existing_iam    = true
