@@ -12,3 +12,8 @@ module "k8s_cluster" {
   min_size            = var.min_size
   max_size            = var.max_size
 }
+
+
+provider "aws" {
+  region = var.aws_region
+}
