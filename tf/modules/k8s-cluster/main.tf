@@ -34,7 +34,7 @@ resource "aws_instance" "control_plane" {
   vpc_security_group_ids      = [aws_security_group.k8s_sg.id]
   user_data                   = file("${path.module}/user_data_control_plane.sh")
   user_data_replace_on_change = true
-  iam_instance_profile        = local.control_plane_profile_name
+  iam_instance_profile        = var.control_plane_profile_name
 
   tags = {
     Name = "deema-task-k8s-control-plane"

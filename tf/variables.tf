@@ -1,3 +1,4 @@
+
 variable "aws_region" {
   type = string
 }
@@ -37,4 +38,3 @@ variable "max_size" {
 variable "worker_instance_type" {
   type = string
 }
-

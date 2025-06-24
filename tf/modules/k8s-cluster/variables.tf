@@ -1,3 +1,4 @@
+
 variable "aws_region" {
   type = string
 }
@@ -42,3 +43,7 @@ variable "worker_subnet_ids" {
   type = list(string)
 }
 
+variable "control_plane_profile_name" {
+  type        = string
+  description = "IAM instance profile name for the control plane EC2"
+}
