@@ -34,4 +34,5 @@ apt-get install -y kubelet kubeadm kubectl
 apt-mark hold kubelet kubeadm kubectl
 
 # Join the Kubernetes cluster
-kubeadm join 10.0.0.211:6443 --token 4wdy90.v55akjhasezi8rsw --discovery-token-ca-cert-hash sha256:dbbec94be0e87fdc2ba2825ece843d1c060f88174268c731b9a7a2b250a4bbe4
+kubeadm join 10.0.0.201:6443 --token 0wr4p7.bylav1buws6f7xb1 \
+    --discovery-token-ca-cert-hash sha256:5d963992e4b16da65c118245e438ffc02e3d36bbc1740f84f1d093a4fc15bb5
