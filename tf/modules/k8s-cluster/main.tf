@@ -41,11 +41,21 @@ resource "aws_instance" "control_plane" {
   }
 }
 
+# ✅ IAM instance profile for worker nodes
+resource "aws_iam_instance_profile" "worker_profile" {
+  name = "deema-k8s-worker-profile"
+  role = "deema-k8s-control-plane-role"  # Reuse the same role with Secrets Manager permissions
+}
+
 resource "aws_launch_template" "worker" {
   name_prefix   = "deema-k8s-worker-"
   image_id      = var.ami_id
   instance_type = var.worker_instance_type
   key_name      = var.key_name
+
+  iam_instance_profile {
+    name = aws_iam_instance_profile.worker_profile.name
+  }
 
   user_data = filebase64("${path.module}/user_data_worker.sh")
   vpc_security_group_ids = [aws_security_group.k8s_sg.id]
