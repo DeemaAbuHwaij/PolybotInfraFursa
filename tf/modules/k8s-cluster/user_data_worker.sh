@@ -1,10 +1,9 @@
 #!/bin/bash
 set -e
 
-# These instructions are for Kubernetes v1.32
 KUBERNETES_VERSION=v1.32
 
-# Install base tools
+# Update & install basic tools
 sudo apt-get update
 sudo apt-get install jq unzip ebtables ethtool -y
 
@@ -17,19 +16,16 @@ sudo ./aws/install
 cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
 net.ipv4.ip_forward = 1
 EOF
-
 sudo sysctl --system
 
 # Add Kubernetes and CRI-O repositories
 curl -fsSL https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/deb/Release.key | \
     sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-
 echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/deb/ /" | \
     sudo tee /etc/apt/sources.list.d/kubernetes.list
 
 curl -fsSL https://pkgs.k8s.io/addons:/cri-o:/prerelease:/main/deb/Release.key | \
     sudo gpg --dearmor -o /etc/apt/keyrings/cri-o-apt-keyring.gpg
-
 echo "deb [signed-by=/etc/apt/keyrings/cri-o-apt-keyring.gpg] https://pkgs.k8s.io/addons:/cri-o:/prerelease:/main/deb/ /" | \
     sudo tee /etc/apt/sources.list.d/cri-o.list
 
@@ -43,34 +39,46 @@ sudo systemctl start crio.service
 sudo systemctl enable --now crio.service
 sudo systemctl enable --now kubelet
 
-# Disable swap memory
+# Disable swap
 swapoff -a
 (crontab -l ; echo "@reboot /sbin/swapoff -a") | crontab -
 
-# ---------------------------------------------
-# ADDITIONAL SECTION: Join the cluster dynamically
-# ---------------------------------------------
-
-# Join script to fetch from AWS Secrets Manager and run
+# Create dynamic join script
 cat <<'EOF' > /opt/k8s-join.sh
 #!/bin/bash
+set -e
+
 if [ -f /etc/kubernetes/kubelet.conf ]; then
-  echo "Node already joined. Skipping join."
+  echo "✅ Node already joined. Skipping."
   exit 0
 fi
+
+# Wait until aws CLI is available
+for i in {1..10}; do
+  if command -v aws &> /dev/null; then break; fi
+  echo "⏳ Waiting for AWS CLI..."
+  sleep 5
+done
+
+# Fetch join command from Secrets Manager
 JOIN_CMD=$(aws secretsmanager get-secret-value \
   --secret-id kubeadm_join_command \
   --region us-west-1 \
   --query SecretString \
   --output text)
 
-echo "Running: \$JOIN_CMD"
-eval "\$JOIN_CMD"
+if [ -z "$JOIN_CMD" ]; then
+  echo "❌ Failed to retrieve join command"
+  exit 1
+fi
+
+echo "🚀 Executing: $JOIN_CMD"
+eval "$JOIN_CMD"
 EOF
 
 chmod +x /opt/k8s-join.sh
 
-# systemd unit file to run the join script once on boot
+# Create systemd unit
 cat <<EOF > /etc/systemd/system/k8s-join.service
 [Unit]
 Description=Kubernetes Worker Join Script
@@ -85,7 +93,7 @@ RemainAfterExit=true
 WantedBy=multi-user.target
 EOF
 
-# Enable the service
+# Enable it
 systemctl daemon-reexec
 systemctl daemon-reload
 systemctl enable k8s-join.service
