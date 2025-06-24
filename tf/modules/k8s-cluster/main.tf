@@ -34,17 +34,12 @@ resource "aws_instance" "control_plane" {
   vpc_security_group_ids      = [aws_security_group.k8s_sg.id]
   user_data                   = file("${path.module}/user_data_control_plane.sh")
   user_data_replace_on_change = true
-  iam_instance_profile        = var.control_plane_profile_name
+
+  iam_instance_profile        = "deema-k8s-control-plane-profile"  # ✅ attach instance profile
 
   tags = {
     Name = "deema-task-k8s-control-plane"
   }
-}
-
-# ✅ IAM instance profile for worker nodes
-resource "aws_iam_instance_profile" "worker_profile" {
-  name = "deema-k8s-worker-profile"
-  role = "deema-k8s-control-plane-role"  # Reuse the same role with Secrets Manager permissions
 }
 
 resource "aws_launch_template" "worker" {
@@ -53,12 +48,12 @@ resource "aws_launch_template" "worker" {
   instance_type = var.worker_instance_type
   key_name      = var.key_name
 
-  iam_instance_profile {
-    name = aws_iam_instance_profile.worker_profile.name
-  }
-
   user_data = filebase64("${path.module}/user_data_worker.sh")
   vpc_security_group_ids = [aws_security_group.k8s_sg.id]
+
+  iam_instance_profile {
+    name = "deema-k8s-worker-profile"  # ✅ attach instance profile to workers
+  }
 
   tag_specifications {
     resource_type = "instance"
