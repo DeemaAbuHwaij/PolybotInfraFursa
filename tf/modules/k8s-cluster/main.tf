@@ -1,18 +1,16 @@
 resource "aws_instance" "control_plane" {
-  ami           = "ami-014e30c8a36252ae5"   #✅ Ubuntu 22.04 in us-west-1
-  instance_type = "t3.medium"
-  key_name      = var.key_name
-
-  user_data = file("${path.module}/user_data_control_plane.sh")
+  ami                         = "ami-014e30c8a36252ae5"
+  instance_type               = "t3.medium"
+  key_name                    = var.key_name
+  user_data                   = file("${path.module}/user_data_control_plane.sh")
   user_data_replace_on_change = true
+  subnet_id                   = var.subnet_id
+
+  vpc_security_group_ids = [aws_security_group.k8s_sg.id]
 
   tags = {
     Name = "deema-task-k8s-control-plane"
   }
-
-  vpc_security_group_ids = [aws_security_group.k8s_sg.id]
-
-  subnet_id = var.subnet_id  # 👈 Must be passed from root (see note below)
 }
 
 resource "aws_security_group" "k8s_sg" {
@@ -38,5 +36,46 @@ resource "aws_security_group" "k8s_sg" {
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# Worker Node Launch Template
+resource "aws_launch_template" "worker" {
+  name_prefix   = "k8s-worker-"
+  image_id      = var.ami_id
+  instance_type = var.worker_instance_type
+  key_name      = var.key_name
+
+  user_data = filebase64("${path.module}/user_data_worker.sh")
+
+  vpc_security_group_ids = [aws_security_group.k8s_sg.id]
+
+  tag_specifications {
+    resource_type = "instance"
+    tags = {
+      Name = "k8s-worker"
+    }
+  }
+}
+
+# Auto Scaling Group for Worker Nodes
+resource "aws_autoscaling_group" "worker_asg" {
+  desired_capacity     = var.desired_capacity
+  max_size             = var.max_size
+  min_size             = var.min_size
+  vpc_zone_identifier  = var.worker_subnet_ids
+  launch_template {
+    id      = aws_launch_template.worker.id
+    version = "$Latest"
+  }
+
+  tag {
+    key                 = "Name"
+    value               = "k8s-worker"
+    propagate_at_launch = true
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 }
