@@ -1,29 +1,39 @@
+variable "aws_region" {
+  type = string
+}
+
+variable "key_name" {
+  type = string
+}
+
+variable "vpc_id" {
+  type = string
+}
+
+variable "subnet_id" {
+  type = string
+}
+
 variable "ami_id" {
-  description = "AMI ID for worker nodes"
-  type        = string
-}
-
-variable "worker_instance_type" {
-  description = "Instance type for worker nodes"
-  type        = string
-}
-
-variable "desired_capacity" {
-  description = "Desired number of worker nodes"
-  type        = number
-}
-
-variable "min_size" {
-  description = "Minimum number of worker nodes"
-  type        = number
-}
-
-variable "max_size" {
-  description = "Maximum number of worker nodes"
-  type        = number
+  type = string
 }
 
 variable "worker_subnet_ids" {
-  description = "Subnets for the worker nodes"
-  type        = list(string)
+  type = list(string)
+}
+
+variable "desired_capacity" {
+  type = number
+}
+
+variable "min_size" {
+  type = number
+}
+
+variable "max_size" {
+  type = number
+}
+
+variable "worker_instance_type" {
+  type = string
 }

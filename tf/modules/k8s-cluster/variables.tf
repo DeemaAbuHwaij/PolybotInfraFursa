@@ -41,3 +41,4 @@ variable "max_size" {
 variable "worker_subnet_ids" {
   type = list(string)
 }
+
