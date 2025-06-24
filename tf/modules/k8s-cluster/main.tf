@@ -128,3 +128,4 @@ resource "aws_autoscaling_group" "worker_asg" {
     create_before_destroy = true
   }
 }
+
