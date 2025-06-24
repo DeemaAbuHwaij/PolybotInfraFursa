@@ -21,7 +21,7 @@ jobs:
           echo "${SSH_KEY}" > key.pem
           chmod 600 key.pem
 
-      - name: Run init_control_plane.sh via SSH
+      - name: Copy and execute init_control_plane.sh on EC2
         run: |
           scp -o StrictHostKeyChecking=no -i key.pem scripts/init_control_plane.sh ubuntu@$CONTROL_PLANE_IP:/home/ubuntu/
-          ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@$CONTROL_PLANE_IP "chmod +x init_control_plane.sh && sudo ./init_control_plane.sh"
+          ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@$CONTROL_PLANE_IP "chmod +x /home/ubuntu/init_control_plane.sh && sudo /home/ubuntu/init_control_plane.sh"
