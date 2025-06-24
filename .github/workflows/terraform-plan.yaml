@@ -1,9 +1,8 @@
 name: Terraform Plan Infra
 
+
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:  # Manually trigger from GitHub
 
 jobs:
   plan:
