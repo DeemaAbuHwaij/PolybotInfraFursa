@@ -1,0 +1,27 @@
+name: Initialize Control Plane
+
+on:
+  workflow_dispatch:  # Manually trigger from GitHub
+
+jobs:
+  init:
+    name: Run kubeadm init
+    runs-on: ubuntu-latest
+
+    env:
+      CONTROL_PLANE_IP: ${{ secrets.CONTROL_PLANE_PUBLIC_IP }}
+      SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create SSH key file
+        run: |
+          echo "${SSH_KEY}" > key.pem
+          chmod 600 key.pem
+
+      - name: Run init_control_plane.sh via SSH
+        run: |
+          scp -o StrictHostKeyChecking=no -i key.pem scripts/init_control_plane.sh ubuntu@$CONTROL_PLANE_IP:/home/ubuntu/
+          ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@$CONTROL_PLANE_IP "chmod +x init_control_plane.sh && sudo ./init_control_plane.sh"
