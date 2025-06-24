@@ -1,22 +1,29 @@
-variable "aws_region" {
+variable "ami_id" {
+  description = "AMI ID for worker nodes"
   type        = string
-  description = "AWS region to deploy resources in"
-  default     = "us-west-1"
 }
 
-variable "key_name" {
+variable "worker_instance_type" {
+  description = "Instance type for worker nodes"
   type        = string
-  description = "EC2 Key Pair for SSH access"
 }
 
-variable "vpc_id" {
-  type        = string
-  description = "ID of the existing VPC"
+variable "desired_capacity" {
+  description = "Desired number of worker nodes"
+  type        = number
 }
 
-variable "subnet_id" {
-  type        = string
-  description = "ID of the subnet to launch the control plane into"
+variable "min_size" {
+  description = "Minimum number of worker nodes"
+  type        = number
 }
 
+variable "max_size" {
+  description = "Maximum number of worker nodes"
+  type        = number
+}
 
+variable "worker_subnet_ids" {
+  description = "Subnets for the worker nodes"
+  type        = list(string)
+}
