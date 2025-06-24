@@ -38,11 +38,10 @@ jobs:
         working-directory: tf
 ''''
 
-
 name: Terraform Apply Infra
 
 on:
-  workflow_dispatch:  # Manual trigger
+  workflow_dispatch:  # Manual trigger only
 
 jobs:
   apply:

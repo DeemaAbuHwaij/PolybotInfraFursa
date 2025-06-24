@@ -38,8 +38,3 @@ variable "worker_instance_type" {
   type = string
 }
 
-variable "use_existing_iam" {
-  description = "Use existing IAM instance profile"
-  type        = bool
-  default     = false
-}
