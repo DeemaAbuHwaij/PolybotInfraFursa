@@ -31,3 +31,27 @@ variable "worker_subnet_ids" {
   description = "List of subnets to launch worker nodes in"
   type        = list(string)
 }
+
+variable "aws_region" {
+  type = string
+}
+
+variable "key_name" {
+  type = string
+}
+
+variable "vpc_id" {
+  type = string
+}
+
+variable "subnet_id" {
+  type = string
+}
+
+variable "ami_id" {
+  type = string
+}
+
+variable "worker_subnet_ids" {
+  type = list(string)
+}
