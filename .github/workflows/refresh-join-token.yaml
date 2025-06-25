@@ -1,0 +1,25 @@
+name: Refresh K8s Join Token
+
+on:
+  schedule:
+    - cron: '0 */12 * * *'  # every 12 hours
+  workflow_dispatch:        # allow manual trigger
+
+jobs:
+  refresh-token:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: us-west-1
+
+    steps:
+      - name: Refresh join token via SSH
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.CONTROL_PLANE_IP }}
+          username: ubuntu
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            curl -O https://raw.githubusercontent.com/AmeeraRayan/PolybotInfra/main/scripts/refresh-k8s-join-token.sh
+            chmod +x refresh-k8s-join-token.sh
+            AWS_REGION=us-west-1 ./refresh-k8s-join-token.sh

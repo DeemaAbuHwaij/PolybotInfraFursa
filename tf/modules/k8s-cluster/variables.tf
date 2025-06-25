@@ -1,49 +1,49 @@
-
-variable "aws_region" {
-  type = string
+variable "region" {
+  description = "AWS region (e.g., us-west-1)"
+  type        = string
 }
 
-variable "key_name" {
-  type = string
-}
-
-variable "vpc_id" {
-  type = string
-}
-
-variable "subnet_id" {
-  type = string
+variable "env" {
+  description = "Environment name (e.g., dev, prod)"
+  type        = string
 }
 
 variable "ami_id" {
-  type = string
+  description = "AMI ID to use for EC2 instances"
+  type        = string
 }
 
-variable "worker_instance_type" {
-  type    = string
-  default = "t3.medium"
+variable "instance_type" {
+  description = "Instance type for EC2 instances (e.g., t3.medium)"
+  type        = string
+}
+
+variable "key_name" {
+  description = "SSH key pair name"
+  type        = string
+}
+
+variable "azs" {
+  description = "List of availability zones to use"
+  type        = list(string)
+}
+
+variable "vpc_cidr" {
+  description = "CIDR block for the VPC"
+  type        = string
 }
 
 variable "desired_capacity" {
-  type    = number
-  default = 2
+  description = "Desired number of worker nodes"
+  type        = number
 }
 
 variable "min_size" {
-  type    = number
-  default = 1
+  description = "Minimum number of worker nodes in ASG"
+  type        = number
 }
 
 variable "max_size" {
-  type    = number
-  default = 3
-}
-
-variable "worker_subnet_ids" {
-  type = list(string)
-}
-
-variable "control_plane_profile_name" {
-  type        = string
-  description = "IAM instance profile name for the control plane EC2"
+  description = "Maximum number of worker nodes in ASG"
+  type        = number
 }

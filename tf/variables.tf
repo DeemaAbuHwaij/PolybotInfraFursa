@@ -1,40 +1,30 @@
-
-variable "aws_region" {
-  type = string
-}
-
-variable "key_name" {
-  type = string
-}
-
-variable "vpc_id" {
-  type = string
-}
-
-variable "subnet_id" {
-  type = string
+variable "env" {
+  description = "Deployment environment"
+  type        = string
 }
 
 variable "ami_id" {
-  type = string
+  description = "AMI ID to use for EC2 instances"
+  type        = string
 }
 
-variable "worker_subnet_ids" {
-  type = list(string)
+variable "instance_type" {
+  description = "EC2 instance type"
+  type        = string
 }
 
-variable "desired_capacity" {
-  type = number
+variable "key_name" {
+  description = "Name of the SSH key pair to use"
+  type        = string
 }
 
-variable "min_size" {
-  type = number
+variable "vpc_cidr" {
+  description = "CIDR block for the VPC"
+  type        = string
 }
 
-variable "max_size" {
-  type = number
+variable "azs" {
+  description = "List of availability zones to deploy in"
+  type        = list(string)
 }
 
-variable "worker_instance_type" {
-  type = string
-}

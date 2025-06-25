@@ -1,14 +1,13 @@
-name: Terraform Apply Infra
+name: Provision K8s Infrastructure
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 jobs:
-  apply:
-    name: Apply Terraform Infrastructure
+  provision:
+    name: Terraform Apply Infra
     runs-on: ubuntu-latest
 
     env:
@@ -17,22 +16,26 @@ jobs:
       AWS_REGION: us-west-1
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.6.6
+          terraform_version: 1.5.7
 
       - name: Terraform Init
+        working-directory: tf
         run: terraform init
-        working-directory: tf
 
-      - name: Select or Create Workspace
-        run: terraform workspace select us-west-1 || terraform workspace new us-west-1
+      - name: Select Terraform Workspace
         working-directory: tf
+        run: terraform workspace select us-west-1 || terraform workspace new us-west-1
+
+      - name: Terraform Plan
+        working-directory: tf
+        run: terraform plan -var-file="region.us-west-1.tfvars"
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve -var-file=region.us-west-1.tfvars
         working-directory: tf
+        run: terraform apply -auto-approve -var-file="region.us-west-1.tfvars"
