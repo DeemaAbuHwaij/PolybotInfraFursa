@@ -1,7 +1,6 @@
 #!/bin/bash
 set -e
 
-# Kubernetes version
 KUBERNETES_VERSION=v1.32
 
 echo "🧩 Installing dependencies..."
@@ -41,21 +40,39 @@ echo "🛑 Disabling swap..."
 sudo swapoff -a
 (crontab -l 2>/dev/null; echo "@reboot /sbin/swapoff -a") | crontab -
 
-echo "🔧 Creating join script..."
+echo "🔧 Creating join script with retry logic..."
 cat << 'EOF' | sudo tee /usr/local/bin/k8s-join.sh
 #!/bin/bash
 set -e
-JOIN_COMMAND=$(aws secretsmanager get-secret-value \
-  --region us-west-1 \
-  --secret-id deema-kubeadm-join-command \
-  --query SecretString \
-  --output text)
+
+SECRET_ID="deema-kubeadm-join-command"
+REGION="us-west-1"
+
+echo "🔑 Attempting to fetch join command from AWS Secrets Manager..."
+
+for attempt in {1..10}; do
+  JOIN_COMMAND=$(aws secretsmanager get-secret-value \
+    --region "$REGION" \
+    --secret-id "$SECRET_ID" \
+    --query SecretString \
+    --output text 2>/dev/null) && break
+
+  echo "⏳ [$attempt] Secret not found yet. Retrying in 15s..."
+  sleep 15
+done
+
+if [ -z "$JOIN_COMMAND" ]; then
+  echo "❌ Failed to fetch join command after retries. Exiting."
+  exit 1
+fi
+
+echo "🤝 Joining cluster..."
 eval "$JOIN_COMMAND"
 EOF
 
 sudo chmod +x /usr/local/bin/k8s-join.sh
 
-echo "🧩 Creating systemd service to run join command on boot..."
+echo "🧩 Creating systemd unit to auto-run join on boot..."
 cat <<EOF | sudo tee /etc/systemd/system/k8s-join.service
 [Unit]
 Description=Join Kubernetes Cluster
@@ -71,6 +88,6 @@ RemainAfterExit=yes
 WantedBy=multi-user.target
 EOF
 
-echo "🔁 Enabling k8s-join.service to run on boot..."
+echo "🟢 Enabling k8s-join.service..."
 sudo systemctl daemon-reexec
 sudo systemctl enable k8s-join.service
