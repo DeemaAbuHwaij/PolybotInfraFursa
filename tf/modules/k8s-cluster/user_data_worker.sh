@@ -41,12 +41,36 @@ echo "🛑 Disabling swap..."
 sudo swapoff -a
 (crontab -l 2>/dev/null; echo "@reboot /sbin/swapoff -a") | crontab -
 
-echo "🔑 Fetching kubeadm join command from AWS Secrets Manager..."
+echo "🔧 Creating join script..."
+cat << 'EOF' | sudo tee /usr/local/bin/k8s-join.sh
+#!/bin/bash
+set -e
 JOIN_COMMAND=$(aws secretsmanager get-secret-value \
   --region us-west-1 \
   --secret-id deema-kubeadm-join-command \
   --query SecretString \
   --output text)
 
-echo "🤝 Joining Kubernetes cluster..."
 eval "$JOIN_COMMAND"
+EOF
+
+sudo chmod +x /usr/local/bin/k8s-join.sh
+
+echo "🧩 Creating systemd service to join the cluster..."
+cat <<EOF | sudo tee /etc/systemd/system/k8s-join.service
+[Unit]
+Description=Join Kubernetes Cluster
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/k8s-join.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reexec
+sudo systemctl enable --now k8s-join.service
