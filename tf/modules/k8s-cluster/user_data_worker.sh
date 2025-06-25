@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# These instructions are for Kubernetes v1.32
+# Kubernetes version
 KUBERNETES_VERSION=v1.32
 
 echo "🧩 Installing dependencies..."
@@ -35,7 +35,7 @@ sudo apt-mark hold kubelet kubeadm kubectl
 echo "🚀 Starting services..."
 sudo systemctl daemon-reexec
 sudo systemctl enable --now crio
-sudo systemctl enable --now kubelet
+sudo systemctl enable kubelet
 
 echo "🛑 Disabling swap..."
 sudo swapoff -a
@@ -50,13 +50,12 @@ JOIN_COMMAND=$(aws secretsmanager get-secret-value \
   --secret-id deema-kubeadm-join-command \
   --query SecretString \
   --output text)
-
 eval "$JOIN_COMMAND"
 EOF
 
 sudo chmod +x /usr/local/bin/k8s-join.sh
 
-echo "🧩 Creating systemd service to join the cluster..."
+echo "🧩 Creating systemd service to run join command on boot..."
 cat <<EOF | sudo tee /etc/systemd/system/k8s-join.service
 [Unit]
 Description=Join Kubernetes Cluster
@@ -72,5 +71,6 @@ RemainAfterExit=yes
 WantedBy=multi-user.target
 EOF
 
+echo "🔁 Enabling k8s-join.service to run on boot..."
 sudo systemctl daemon-reexec
-sudo systemctl enable --now k8s-join.service
+sudo systemctl enable k8s-join.service
