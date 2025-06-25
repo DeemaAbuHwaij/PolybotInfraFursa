@@ -1,11 +1,11 @@
 name: Initialize Control Plane
 
 on:
-  workflow_dispatch:  # Manually trigger from GitHub
+  workflow_dispatch:  # Manually trigger from GitHub UI
 
 jobs:
   init:
-    name: Run kubeadm init
+    name: Initialize kubeadm Control Plane
     runs-on: ubuntu-latest
 
     env:
@@ -21,7 +21,10 @@ jobs:
           echo "${SSH_KEY}" > key.pem
           chmod 600 key.pem
 
-      - name: Copy and execute init_control_plane.sh on EC2
+      - name: Copy and run init_control_plane.sh on EC2
         run: |
+          echo "📦 Copying init script to EC2..."
           scp -o StrictHostKeyChecking=no -i key.pem scripts/init_control_plane.sh ubuntu@$CONTROL_PLANE_IP:/home/ubuntu/
+
+          echo "🚀 Executing control plane init on EC2..."
           ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@$CONTROL_PLANE_IP "chmod +x /home/ubuntu/init_control_plane.sh && sudo /home/ubuntu/init_control_plane.sh"

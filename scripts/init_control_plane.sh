@@ -15,20 +15,26 @@ if [ ! -f /etc/kubernetes/admin.conf ]; then
 
   echo "🌐 Installing Flannel network plugin..."
   kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
-
-  echo "🔐 Creating permanent kubeadm join token..."
-  JOIN_CMD=$(sudo kubeadm token create --ttl 0 --print-join-command)
-
-  echo "🔑 Storing join command in AWS Secrets Manager..."
-  aws secretsmanager put-secret-value \
-    --secret-id kubeadm-join-command \
-    --secret-string "$JOIN_CMD" \
-    --region us-west-1
-
-
-  echo "✅ Control plane initialization and join command storage completed."
 else
-  echo "⚠️ Control plane already initialized. Skipping..."
+  echo "⚠️ Control plane already initialized. Skipping kubeadm init..."
 fi
 
+echo "🔐 Generating permanent kubeadm join token..."
+JOIN_CMD=$(echo "sudo $(kubeadm token create --ttl 0 --print-join-command)")
+echo "$JOIN_CMD" > /tmp/k8s_join.sh
 
+echo "🧪 Verifying AWS CLI..."
+if ! command -v aws &> /dev/null; then
+  echo "🌍 Installing AWS CLI..."
+  curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+  unzip -q awscliv2.zip
+  sudo ./aws/install
+fi
+
+echo "🔑 Updating join command in AWS Secrets Manager..."
+aws secretsmanager put-secret-value \
+  --secret-id K8S_JOIN_COMMAND \
+  --secret-string file:///tmp/k8s_join.sh \
+  --region us-west-1
+
+echo "✅ Join command stored successfully in secret K8S_JOIN_COMMAND (us-west-1)"
