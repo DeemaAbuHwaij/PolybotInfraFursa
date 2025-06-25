@@ -1,7 +1,10 @@
 #!/bin/bash
 set -e
 
+# Set Kubernetes version
 KUBERNETES_VERSION=v1.32
+REGION="us-west-1"
+SECRET_ID="deema-kubeadm-join-command"
 
 echo "🧩 Installing dependencies..."
 sudo apt-get update
@@ -18,7 +21,7 @@ net.ipv4.ip_forward = 1
 EOF
 sudo sysctl --system
 
-echo "📦 Installing CRI-O and Kubernetes components..."
+echo "📦 Adding Kubernetes and CRI-O repositories..."
 sudo mkdir -p /etc/apt/keyrings
 
 curl -fsSL https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
@@ -27,6 +30,7 @@ echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.
 curl -fsSL https://pkgs.k8s.io/addons:/cri-o:/prerelease:/main/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/cri-o-apt-keyring.gpg
 echo "deb [signed-by=/etc/apt/keyrings/cri-o-apt-keyring.gpg] https://pkgs.k8s.io/addons:/cri-o:/prerelease:/main/deb/ /" | sudo tee /etc/apt/sources.list.d/cri-o.list
 
+echo "📦 Installing CRI-O and Kubernetes components..."
 sudo apt-get update
 sudo apt-get install -y cri-o kubelet kubeadm kubectl
 sudo apt-mark hold kubelet kubeadm kubectl
@@ -40,16 +44,7 @@ echo "🛑 Disabling swap..."
 sudo swapoff -a
 (crontab -l 2>/dev/null; echo "@reboot /sbin/swapoff -a") | crontab -
 
-echo "🔧 Creating join script with retry logic..."
-cat << 'EOF' | sudo tee /usr/local/bin/k8s-join.sh
-#!/bin/bash
-set -e
-
-SECRET_ID="deema-kubeadm-join-command"
-REGION="us-west-1"
-
-echo "🔑 Attempting to fetch join command from AWS Secrets Manager..."
-
+echo "🔑 Fetching kubeadm join command from AWS Secrets Manager..."
 for attempt in {1..10}; do
   JOIN_COMMAND=$(aws secretsmanager get-secret-value \
     --region "$REGION" \
@@ -62,33 +57,9 @@ for attempt in {1..10}; do
 done
 
 if [ -z "$JOIN_COMMAND" ]; then
-  echo "❌ Failed to fetch join command after retries. Exiting."
+  echo "❌ Failed to fetch join command. Exiting."
   exit 1
 fi
 
-echo "🤝 Joining cluster..."
+echo "🤝 Joining the Kubernetes cluster..."
 eval "$JOIN_COMMAND"
-EOF
-
-sudo chmod +x /usr/local/bin/k8s-join.sh
-
-echo "🧩 Creating systemd unit to auto-run join on boot..."
-cat <<EOF | sudo tee /etc/systemd/system/k8s-join.service
-[Unit]
-Description=Join Kubernetes Cluster (delayed to wait for secret)
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=oneshot
-ExecStart=/bin/bash -c "sleep 60 && /usr/local/bin/k8s-join.sh"
-RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-
-echo "🟢 Enabling k8s-join.service..."
-sudo systemctl daemon-reexec
-sudo systemctl enable k8s-join.service
