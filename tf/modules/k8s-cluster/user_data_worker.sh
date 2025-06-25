@@ -75,18 +75,19 @@ sudo chmod +x /usr/local/bin/k8s-join.sh
 echo "🧩 Creating systemd unit to auto-run join on boot..."
 cat <<EOF | sudo tee /etc/systemd/system/k8s-join.service
 [Unit]
-Description=Join Kubernetes Cluster
+Description=Join Kubernetes Cluster (delayed to wait for secret)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/k8s-join.sh
+ExecStart=/bin/bash -c "sleep 60 && /usr/local/bin/k8s-join.sh"
 RemainAfterExit=yes
 
 [Install]
 WantedBy=multi-user.target
 EOF
+
 
 echo "🟢 Enabling k8s-join.service..."
 sudo systemctl daemon-reexec
