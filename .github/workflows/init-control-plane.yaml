@@ -23,9 +23,10 @@ jobs:
           script: |
             echo "🔧 Running kubeadm init script..."
 
-            curl -O https://raw.githubusercontent.com/DeemaAbuHwaij/PolybotInfraFursa/main/scripts/kubeadm-init.sh
-            chmod +x kubeadm-init.sh
-            ./kubeadm-init.sh
+=
+            curl -O https://raw.githubusercontent.com/DeemaAbuHwaij/PolybotInfraFursa/main/scripts/init_control_plane.sh
+            chmod +x init_control_plane.sh
+            ./init_control_plane.sh
 
             echo "sudo $(kubeadm token create --print-join-command)" > /tmp/k8s_join.sh
 
