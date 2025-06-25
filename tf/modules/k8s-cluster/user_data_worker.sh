@@ -1,84 +1,90 @@
 #!/bin/bash
 set -e
 
-# These instructions are for Kubernetes v1.32
-KUBERNETES_VERSION=v1.32
-
 echo "🛠️ Installing dependencies..."
 sudo apt-get update
-sudo apt-get install -y jq unzip ebtables ethtool
+sudo apt-get install -y jq unzip ebtables ethtool software-properties-common apt-transport-https ca-certificates curl gpg
 
-# Install AWS CLI
-echo "☁️ Installing AWS CLI..."
-curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-unzip -q awscliv2.zip
-sudo ./aws/install
+# Set Kubernetes version
+KUBERNETES_VERSION=v1.32
 
-# Enable IPv4 forwarding
+echo "📦 Setting up repositories..."
+sudo mkdir -p /etc/apt/keyrings
+
+# Kubernetes
+curl -fsSL https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/deb/Release.key | \
+  sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/deb/ /" | \
+  sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+# CRI-O
+curl -fsSL https://pkgs.k8s.io/addons:/cri-o:/prerelease:/main/deb/Release.key | \
+  sudo gpg --dearmor -o /etc/apt/keyrings/cri-o-apt-keyring.gpg
+
+echo "deb [signed-by=/etc/apt/keyrings/cri-o-apt-keyring.gpg] https://pkgs.k8s.io/addons:/cri-o:/prerelease:/main/deb/ /" | \
+  sudo tee /etc/apt/sources.list.d/cri-o.list
+
+sudo apt-get update
+sudo apt-get install -y cri-o kubelet kubeadm kubectl
+sudo apt-mark hold kubelet kubeadm kubectl
+
+echo "🚀 Starting services..."
+sudo systemctl enable crio --now
+sudo systemctl enable kubelet --now
+
+echo "🚫 Disabling swap..."
+sudo swapoff -a
+(crontab -l ; echo "@reboot /sbin/swapoff -a") | crontab -
+
 echo "🔧 Enabling IPv4 forwarding..."
 cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
 net.ipv4.ip_forward = 1
 EOF
-
 sudo sysctl --system
 
-# Add CRI-O and Kubernetes repositories
-echo "📦 Adding Kubernetes and CRI-O repositories..."
-sudo mkdir -p /etc/apt/keyrings
+echo "☁️ Installing AWS CLI..."
+curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip -q awscliv2.zip
+sudo ./aws/install
 
-curl -fsSL https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
-
-curl -fsSL https://pkgs.k8s.io/addons:/cri-o:/prerelease:/main/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/cri-o-apt-keyring.gpg
-echo "deb [signed-by=/etc/apt/keyrings/cri-o-apt-keyring.gpg] https://pkgs.k8s.io/addons:/cri-o:/prerelease:/main/deb/ /" | sudo tee /etc/apt/sources.list.d/cri-o.list
-
-sudo apt-get update
-sudo apt-get install -y software-properties-common apt-transport-https ca-certificates curl gpg
-sudo apt-get install -y cri-o kubelet kubeadm kubectl
-sudo apt-mark hold kubelet kubeadm kubectl
-
-# Start CRI-O and kubelet
-sudo systemctl start crio
-sudo systemctl enable crio
-sudo systemctl enable kubelet
-
-# Disable swap permanently
-echo "🚫 Disabling swap..."
-swapoff -a
-(crontab -l ; echo "@reboot /sbin/swapoff -a") | crontab -
-
-# 🧠 Fetch join command
-echo "🔑 Fetching kubeadm join command from AWS Secrets Manager..."
-JOIN_COMMAND=$(sudo aws secretsmanager get-secret-value \
+echo "📄 Creating join script..."
+sudo tee /usr/local/bin/k8s-join.sh > /dev/null <<'EOF'
+#!/bin/bash
+set -e
+JOIN_CMD=$(aws secretsmanager get-secret-value \
   --region us-west-1 \
   --secret-id deema-kubeadm-join-command \
   --query SecretString \
-  --output text || true)
+  --output text)
 
-if [ -n "$JOIN_COMMAND" ]; then
-  echo "📄 Writing join script to /opt/k8s-join.sh"
-  echo "$JOIN_COMMAND" | sudo tee /opt/k8s-join.sh > /dev/null
-  sudo chmod +x /opt/k8s-join.sh
+if [ -n "$JOIN_CMD" ]; then
+  echo "Executing join command..."
+  eval "$JOIN_CMD"
+else
+  echo "Failed to fetch join command from AWS Secrets Manager"
+  exit 1
+fi
+EOF
 
-  echo "🛠️ Creating systemd service to run kubeadm join..."
-  cat <<EOF | sudo tee /etc/systemd/system/k8s-join.service
+sudo chmod +x /usr/local/bin/k8s-join.sh
+
+echo "🧩 Creating systemd service for auto-join..."
+sudo tee /etc/systemd/system/k8s-join.service > /dev/null <<EOF
 [Unit]
 Description=Join Kubernetes Cluster
 After=network.target
 
 [Service]
 Type=oneshot
-ExecStart=/opt/k8s-join.sh
-RemainAfterExit=true
+ExecStart=/usr/local/bin/k8s-join.sh
+RemainAfterExit=yes
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-  echo "🚀 Enabling and starting k8s-join.service..."
-  sudo systemctl daemon-reexec
-  sudo systemctl daemon-reload
-  sudo systemctl enable --now k8s-join.service
-else
-  echo "❌ Could not retrieve join command. Skipping join."
-fi
+echo "🔄 Enabling join service..."
+sudo systemctl daemon-reexec
+sudo systemctl daemon-reload
+sudo systemctl ena
