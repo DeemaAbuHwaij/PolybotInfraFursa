@@ -21,11 +21,14 @@ if [ ! -f /etc/kubernetes/admin.conf ]; then
 
   echo "🔑 Storing join command in AWS Secrets Manager..."
   aws secretsmanager put-secret-value \
-    --secret-id kubeadm_join_command \
+    --secret-id kubeadm-join-command \
     --secret-string "$JOIN_CMD" \
     --region us-west-1
+
 
   echo "✅ Control plane initialization and join command storage completed."
 else
   echo "⚠️ Control plane already initialized. Skipping..."
 fi
+
+
