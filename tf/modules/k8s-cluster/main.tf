@@ -35,7 +35,7 @@ resource "aws_instance" "control_plane" {
   user_data                   = file("${path.module}/user_data_control_plane.sh")
   user_data_replace_on_change = true
 
-  iam_instance_profile        = "deema-k8s-control-plane-profile"  # ✅ attach instance profile
+  iam_instance_profile        = "deema-k8s-control-plane-profile"
 
   tags = {
     Name = "deema-task-k8s-control-plane"
@@ -52,13 +52,14 @@ resource "aws_launch_template" "worker" {
   vpc_security_group_ids = [aws_security_group.k8s_sg.id]
 
   iam_instance_profile {
-    name = "deema-k8s-worker-profile"  # ✅ attach instance profile to workers
+    name = "deema-k8s-worker-profile"
   }
 
   tag_specifications {
     resource_type = "instance"
     tags = {
-      Name = "deema-k8s-worker"
+      Name    = "deema-k8s-worker"
+      Version = "v1" # ✅ Dummy tag (you can change to v2 to trigger refresh manually)
     }
   }
 }
@@ -82,5 +83,14 @@ resource "aws_autoscaling_group" "worker_asg" {
 
   lifecycle {
     create_before_destroy = true
+  }
+
+  # ✅ Refresh instances on launch template change
+  instance_refresh {
+    strategy = "Rolling"
+    preferences {
+      min_healthy_percentage = 0
+      instance_warmup        = 30
+    }
   }
 }
