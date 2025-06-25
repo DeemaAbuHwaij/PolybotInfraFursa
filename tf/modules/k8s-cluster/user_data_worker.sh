@@ -36,8 +36,7 @@ sudo apt-get install -y cri-o kubelet kubeadm kubectl
 sudo apt-mark hold kubelet kubeadm kubectl
 
 # Start CRI-O but delay kubelet
-sudo systemctl start crio.service
-sudo systemctl enable --now crio.service
+sudo systemctl enable --now crio
 sudo systemctl disable --now kubelet  # will be started after join
 
 # Disable swap permanently
@@ -65,7 +64,7 @@ for i in {1..10}; do
 done
 
 JOIN_CMD=$(aws secretsmanager get-secret-value \
-  --secret-id kubeadm-join-command \
+  --secret-id kubeadm_join_command \
   --region us-west-1 \
   --query SecretString \
   --output text)
@@ -75,7 +74,7 @@ if [ -z "$JOIN_CMD" ]; then
   exit 1
 fi
 
-FINAL_CMD="$JOIN_CMD --cri-socket unix:///var/run/containerd/containerd.sock"
+FINAL_CMD="$JOIN_CMD --cri-socket unix:///var/run/crio/crio.sock"
 echo "🚀 Running join command..."
 eval "$FINAL_CMD"
 
@@ -104,3 +103,6 @@ EOF
 sudo systemctl daemon-reexec
 sudo systemctl daemon-reload
 sudo systemctl enable k8s-join.service
+
+# 🔄 Run join script now (not just at next boot)
+sudo /opt/k8s-join.sh || true
