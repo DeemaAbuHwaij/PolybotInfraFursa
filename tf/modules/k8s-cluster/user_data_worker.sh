@@ -47,9 +47,8 @@ echo "🚫 Disabling swap..."
 swapoff -a
 (crontab -l ; echo "@reboot /sbin/swapoff -a") | crontab -
 
-# 🧠 Auto-join the worker node to the Kubernetes cluster
+# 🧠 Fetch join command
 echo "🔑 Fetching kubeadm join command from AWS Secrets Manager..."
-
 JOIN_COMMAND=$(sudo aws secretsmanager get-secret-value \
   --region us-west-1 \
   --secret-id deema-kubeadm-join-command \
@@ -57,8 +56,29 @@ JOIN_COMMAND=$(sudo aws secretsmanager get-secret-value \
   --output text || true)
 
 if [ -n "$JOIN_COMMAND" ]; then
-  echo "🚀 Joining the Kubernetes cluster..."
-  eval "$JOIN_COMMAND"
+  echo "📄 Writing join script to /opt/k8s-join.sh"
+  echo "$JOIN_COMMAND" | sudo tee /opt/k8s-join.sh > /dev/null
+  sudo chmod +x /opt/k8s-join.sh
+
+  echo "🛠️ Creating systemd service to run kubeadm join..."
+  cat <<EOF | sudo tee /etc/systemd/system/k8s-join.service
+[Unit]
+Description=Join Kubernetes Cluster
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/k8s-join.sh
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  echo "🚀 Enabling and starting k8s-join.service..."
+  sudo systemctl daemon-reexec
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now k8s-join.service
 else
-  echo "❌ Failed to fetch join command from Secrets Manager"
+  echo "❌ Could not retrieve join command. Skipping join."
 fi
