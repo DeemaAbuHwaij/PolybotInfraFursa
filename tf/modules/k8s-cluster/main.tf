@@ -150,6 +150,7 @@ resource "aws_instance" "control_plane" {
 
   tags = {
     Name = "deema-k8s-control-plane"
+    Role = "control-plane"
   }
 }
 
@@ -216,6 +217,7 @@ resource "aws_launch_template" "worker_lt" {
     resource_type = "instance"
     tags = {
       Name = "k8s-worker-${var.env}"
+      Role = "worker"
     }
   }
 }
@@ -236,6 +238,12 @@ resource "aws_autoscaling_group" "worker_asg" {
   tag {
     key                 = "Name"
     value               = "k8s-worker-${var.env}"
+    propagate_at_launch = true
+  }
+
+  tag {
+    key                 = "Role"
+    value               = "worker"
     propagate_at_launch = true
   }
 
