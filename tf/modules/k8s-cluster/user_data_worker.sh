@@ -49,23 +49,23 @@ sudo swapoff -a
 echo "🔧 Creating systemd unit: k8s-join.service"
 cat <<EOF | sudo tee /etc/systemd/system/k8s-join.service
 [Unit]
-Description=Join Kubernetes Cluster if not joined
+Description=Join Kubernetes Cluster if not already joined
 After=network.target
 
 [Service]
 Type=oneshot
 ExecStart=/bin/bash -c '
 if [ ! -f /etc/kubernetes/kubelet.conf ]; then
-  echo "🔑 Fetching kubeadm join command from Secrets Manager..."
+  echo "🔑 Fetching join command from Secrets Manager..."
   JOIN_COMMAND=\$(aws secretsmanager get-secret-value \
     --region us-west-1 \
     --secret-id deema-kubeadm-join-command \
     --query SecretString \
     --output text)
-  echo "🚀 Running join command..."
+  echo "🚀 Joining cluster..."
   eval "\$JOIN_COMMAND"
 else
-  echo "✅ Node already part of the cluster. Skipping join."
+  echo "✅ Node already part of the cluster. Skipping."
 fi
 '
 
@@ -73,7 +73,7 @@ fi
 WantedBy=multi-user.target
 EOF
 
-# Enable and start the service
+# Enable and start the join service
 sudo systemctl daemon-reexec
 sudo systemctl daemon-reload
 sudo systemctl enable k8s-join.service
