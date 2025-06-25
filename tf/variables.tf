@@ -1,20 +1,40 @@
+
 variable "aws_region" {
-  type        = string
-  description = "AWS region to deploy resources in"
-  default     = "us-west-1"
+  type = string
 }
 
 variable "key_name" {
-  type        = string
-  description = "EC2 Key Pair for SSH access"
+  type = string
 }
 
 variable "vpc_id" {
-  type        = string
-  description = "ID of the existing VPC"
+  type = string
 }
 
 variable "subnet_id" {
-  type        = string
-  description = "ID of the subnet to launch the control plane into"
+  type = string
+}
+
+variable "ami_id" {
+  type = string
+}
+
+variable "worker_subnet_ids" {
+  type = list(string)
+}
+
+variable "desired_capacity" {
+  type = number
+}
+
+variable "min_size" {
+  type = number
+}
+
+variable "max_size" {
+  type = number
+}
+
+variable "worker_instance_type" {
+  type = string
 }
