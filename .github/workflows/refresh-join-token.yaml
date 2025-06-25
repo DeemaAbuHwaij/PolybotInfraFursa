@@ -20,6 +20,6 @@ jobs:
           username: ubuntu
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            curl -O https://raw.githubusercontent.com/AmeeraRayan/PolybotInfra/main/scripts/refresh-k8s-join-token.sh
+            curl -O https://raw.githubusercontent.com/DeemaAbuHwaij/PolybotInfraFursa/main/scripts/refresh-k8s-join-token.sh
             chmod +x refresh-k8s-join-token.sh
             AWS_REGION=us-west-1 ./refresh-k8s-join-token.sh
