@@ -12,15 +12,18 @@ echo "[TOKEN] ✅ New join command generated."
 if ! command -v aws &> /dev/null; then
   echo "[TOKEN] 🧰 Installing AWS CLI..."
   curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-  unzip awscliv2.zip
+  unzip -q awscliv2.zip
   sudo ./aws/install
 fi
 
 # ✅ Update the value in AWS Secrets Manager
-echo "[TOKEN] 🔐 Updating AWS Secrets Manager with new join command..."
+SECRET_ID=${SECRET_ID:-deema-kubeadm-join-command}
+REGION=${AWS_REGION:-us-west-1}
+
+echo "[TOKEN] 🔐 Updating AWS Secrets Manager (secret: $SECRET_ID, region: $REGION)..."
 aws secretsmanager put-secret-value \
-  --secret-id K8S_JOIN_COMMAND \
+  --secret-id "$SECRET_ID" \
   --secret-string file:///tmp/k8s_join.sh \
-  --region ${AWS_REGION:-us-west-1}
+  --region "$REGION"
 
 echo "[TOKEN] 🎉 Token refreshed successfully."

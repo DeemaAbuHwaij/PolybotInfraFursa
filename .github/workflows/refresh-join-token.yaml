@@ -3,7 +3,7 @@ name: Refresh K8s Join Token
 on:
   schedule:
     - cron: '0 */12 * * *'  # every 12 hours
-  workflow_dispatch:        # allow manual trigger
+  workflow_dispatch:
 
 jobs:
   refresh-token:
@@ -22,4 +22,4 @@ jobs:
           script: |
             curl -O https://raw.githubusercontent.com/DeemaAbuHwaij/PolybotInfraFursa/main/scripts/refresh-k8s-join-token.sh
             chmod +x refresh-k8s-join-token.sh
-            AWS_REGION=us-west-1 ./refresh-k8s-join-token.sh
+            AWS_REGION=us-west-1 SECRET_ID=deema-kubeadm-join-command ./refresh-k8s-join-token.sh

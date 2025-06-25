@@ -23,15 +23,12 @@ jobs:
           script: |
             echo "🔧 Running kubeadm init script..."
 
-            # Step 1: Run kubeadm-init.sh
-            curl -O https://raw.githubusercontent.com/AmeeraRayan/PolybotInfra/main/scripts/kubeadm-init.sh
+            curl -O https://raw.githubusercontent.com/DeemaAbuHwaij/PolybotInfraFursa/main/scripts/kubeadm-init.sh
             chmod +x kubeadm-init.sh
             ./kubeadm-init.sh
 
-            # Step 2: Save kubeadm join command to temp file
             echo "sudo $(kubeadm token create --print-join-command)" > /tmp/k8s_join.sh
 
-            # Step 3: Install AWS CLI if not present
             if ! command -v aws &> /dev/null; then
               echo "Installing AWS CLI..."
               curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
@@ -39,12 +36,11 @@ jobs:
               sudo ./aws/install
             fi
 
-            # Step 4: Save or update join command in AWS Secrets Manager
             aws secretsmanager create-secret \
-              --name K8S_JOIN_COMMAND \
+              --name deema-kubeadm-join-command \
               --secret-string file:///tmp/k8s_join.sh \
               --region us-west-1 || \
             aws secretsmanager put-secret-value \
-              --secret-id K8S_JOIN_COMMAND \
+              --secret-id deema-kubeadm-join-command \
               --secret-string file:///tmp/k8s_join.sh \
               --region us-west-1
