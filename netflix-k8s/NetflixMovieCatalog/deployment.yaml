@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: netflix-movie-cat
+  labels:
+    app: netflix-movie-cat
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: netflix-movie-cat
+  template:
+    metadata:
+        labels:
+          app: netflix-movie-cat
+    spec:
+      containers:
+      - name: netflixmoviecat
+        image: majdabbas99/netflixmoviecat
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-netflix-movie-cat
+spec:
+  selector:
+    app: netflix-movie-cat
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
