@@ -19,7 +19,7 @@ module "k8s_cluster" {
   azs            = ["us-west-1a", "us-west-1b"]
 
   # ⚙️ Auto Scaling Configuration
-  desired_capacity = 2
-  min_size         = 1
+  desired_capacity = 0
+  min_size         = 0
   max_size         = 3
 }
