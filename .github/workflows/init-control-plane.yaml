@@ -1,9 +1,12 @@
+# PURPOSE: This workflow connects to the control plane EC2 instance,
+# initializes the Kubernetes cluster using kubeadm, and securely stores the join command in AWS Secrets Manager.
+
 name: Initialize Kubernetes Cluster
 
 on:
   workflow_dispatch:
 
-  workflow_run:
+  workflow_run:       # Auto-trigger after "Provision K8s Infrastructure" workflow finishes
     workflows: ["Provision K8s Infrastructure"]
     types:
       - completed
@@ -14,6 +17,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Step 1: Connect to the control plane EC2 instance via SSH
       - name: Connect via SSH and run kubeadm init, then save join command
         uses: appleboy/ssh-action@v0.1.10
         with:
@@ -23,13 +27,15 @@ jobs:
           script: |
             echo "🔧 Running kubeadm init script..."
 
-
+            # Download and run the init script
             curl -O https://raw.githubusercontent.com/DeemaAbuHwaij/PolybotInfraFursa/main/scripts/init_control_plane.sh
             chmod +x init_control_plane.sh
             ./init_control_plane.sh
-
+            
+            # Generate the join command and save it to a temp file
             echo "sudo $(kubeadm token create --print-join-command)" > /tmp/k8s_join.sh
 
+            # Install AWS CLI if not already installed
             if ! command -v aws &> /dev/null; then
               echo "Installing AWS CLI..."
               curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
@@ -37,6 +43,7 @@ jobs:
               sudo ./aws/install
             fi
 
+            # Store the join command in AWS Secrets Manager
             aws secretsmanager create-secret \
               --name deema-kubeadm-join-command \
               --secret-string file:///tmp/k8s_join.sh \

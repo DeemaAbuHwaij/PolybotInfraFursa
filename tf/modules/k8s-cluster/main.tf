@@ -1,3 +1,7 @@
+# PURPOSE: This Terraform file provisions all AWS infrastructure resources needed for a Kubernetes cluster,
+# including VPC, subnets, security groups, IAM roles, EC2 control plane instance, and worker Auto Scaling Group.
+
+# ✅ VPC definition
 resource "aws_vpc" "k8s_vpc" {
   cidr_block = "10.0.0.0/16"
 
@@ -6,6 +10,7 @@ resource "aws_vpc" "k8s_vpc" {
   }
 }
 
+# ✅ Internet Gateway for public access
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.k8s_vpc.id
 
@@ -14,6 +19,7 @@ resource "aws_internet_gateway" "igw" {
   }
 }
 
+# ✅ IAM Role for control plane EC2 instance
 resource "aws_iam_role" "control_plane_role" {
   name = "deema-k8s-control-plane-role"
 
@@ -29,6 +35,7 @@ resource "aws_iam_role" "control_plane_role" {
   })
 }
 
+# ✅ Attach required policies to IAM role
 resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
   role       = aws_iam_role.control_plane_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
@@ -54,6 +61,7 @@ resource "aws_iam_role_policy_attachment" "secrets_manager_access" {
   policy_arn = "arn:aws:iam::aws:policy/SecretsManagerReadWrite"
 }
 
+# ✅ IAM instance profiles for EC2 instances
 resource "aws_iam_instance_profile" "control_plane_profile" {
   name = "deema-k8s-control-plane-profile"
   role = aws_iam_role.control_plane_role.name
@@ -64,6 +72,7 @@ resource "aws_iam_instance_profile" "worker_profile" {
   role = aws_iam_role.control_plane_role.name
 }
 
+# ✅ Public subnets across multiple availability zones
 resource "aws_subnet" "public_subnets" {
   count             = 2
   vpc_id            = aws_vpc.k8s_vpc.id
@@ -75,6 +84,7 @@ resource "aws_subnet" "public_subnets" {
   }
 }
 
+# ✅ Route table and default route to Internet Gateway
 resource "aws_route_table" "public_rt" {
   vpc_id = aws_vpc.k8s_vpc.id
 
@@ -95,6 +105,7 @@ resource "aws_route_table_association" "public_assoc" {
   route_table_id = aws_route_table.public_rt.id
 }
 
+# ✅ Security group for control plane
 resource "aws_security_group" "control_plane_sg" {
   name        = "control-plane-sg-${var.env}"
   description = "Allow SSH, Kubernetes API, and internal VPC traffic"
@@ -137,6 +148,7 @@ resource "aws_security_group" "control_plane_sg" {
   }
 }
 
+# ✅ Control plane EC2 instance
 resource "aws_instance" "control_plane" {
   ami                         = var.ami_id
   instance_type               = var.instance_type
@@ -154,6 +166,7 @@ resource "aws_instance" "control_plane" {
   }
 }
 
+# ✅ Elastic IP for control plane
 resource "aws_eip" "control_plane_eip" {
   instance = aws_instance.control_plane.id
 
@@ -162,6 +175,7 @@ resource "aws_eip" "control_plane_eip" {
   }
 }
 
+# ✅ Security group for worker nodes
 resource "aws_security_group" "worker_sg" {
   name        = "worker-sg-${var.env}"
   description = "Allow traffic for worker nodes"
@@ -196,6 +210,7 @@ resource "aws_security_group" "worker_sg" {
   }
 }
 
+# ✅ Launch Template for worker EC2 instances
 resource "aws_launch_template" "worker_lt" {
   name_prefix   = "k8s-worker-${var.env}-"
   image_id      = var.ami_id
@@ -222,6 +237,7 @@ resource "aws_launch_template" "worker_lt" {
   }
 }
 
+# ✅ Auto Scaling Group for worker nodes
 resource "aws_autoscaling_group" "worker_asg" {
   name                = "k8s-worker-asg-${var.env}"
   desired_capacity    = 0

@@ -1,7 +1,10 @@
 #!/bin/bash
-set -e
+# PURPOSE: This script installs CRI-O, kubeadm, and Kubernetes components on the control plane instance,
+# initializes the cluster, installs Flannel CNI, and uploads a permanent join command to AWS Secrets Manager.
 
-# These instructions are for Kubernetes v1.32
+set -e  # Exit immediately if any command fails
+
+# Specify Kubernetes version
 KUBERNETES_VERSION=v1.32
 
 echo "🧩 Installing dependencies..."
@@ -22,12 +25,15 @@ sudo sysctl --system
 echo "📦 Installing CRI-O and Kubernetes components..."
 sudo mkdir -p /etc/apt/keyrings
 
+# Add Kubernetes APT key and repo
 curl -fsSL https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
 
+# Add CRI-O prerelease repo and key
 curl -fsSL https://pkgs.k8s.io/addons:/cri-o:/prerelease:/main/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/cri-o-apt-keyring.gpg
 echo "deb [signed-by=/etc/apt/keyrings/cri-o-apt-keyring.gpg] https://pkgs.k8s.io/addons:/cri-o:/prerelease:/main/deb/ /" | sudo tee /etc/apt/sources.list.d/cri-o.list
 
+# Install CRI-O and Kubernetes tools
 sudo apt-get update
 sudo apt-get install -y cri-o kubelet kubeadm kubectl
 sudo apt-mark hold kubelet kubeadm kubectl
@@ -41,10 +47,11 @@ echo "🛑 Disabling swap..."
 sudo swapoff -a
 (crontab -l 2>/dev/null; echo "@reboot /sbin/swapoff -a") | crontab -
 
-# Only run kubeadm init if not already initialized
+# Check if the cluster is already initialized
 if [ ! -f /etc/kubernetes/admin.conf ]; then
   echo "🚀 Initializing Kubernetes control plane..."
 
+  # Initialize the Kubernetes cluster
   sudo kubeadm init --pod-network-cidr=10.244.0.0/16
 
   echo "🔧 Setting up kubeconfig..."
@@ -60,6 +67,7 @@ if [ ! -f /etc/kubernetes/admin.conf ]; then
   echo "$JOIN_CMD" > /tmp/k8s_join.sh
 
   echo "🔐 Uploading join command to AWS Secrets Manager..."
+  # Upload or update the join command as a secret in AWS
   aws secretsmanager create-secret --name deema-kubeadm-join-command \
     --secret-string file:///tmp/k8s_join.sh \
     --region us-west-1 || true
