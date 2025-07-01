@@ -1,102 +1,73 @@
 #!/bin/bash
-set -euo pipefail
+# PURPOSE: This script installs CRI-O and Kubernetes components on a worker EC2 instance
+# and joins it to the Kubernetes cluster using a join command securely fetched from AWS Secrets Manager.
 
-echo "[user_data] 🚀 Starting worker setup..."
+set -e  # Exit immediately if a command fails
 
+# Set Kubernetes version and AWS Secrets Manager details
 KUBERNETES_VERSION=v1.32
+REGION="us-west-1"
+SECRET_ID="deema-kubeadm-join-command"
 
-# --- Install dependencies ---
+echo "🧩 Installing dependencies..."
 sudo apt-get update
 sudo apt-get install -y jq unzip ebtables ethtool software-properties-common apt-transport-https ca-certificates curl gpg
 
-# --- Install AWS CLI ---
+echo "🔐 Installing AWS CLI..."
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip -q awscliv2.zip
 sudo ./aws/install
 
-# --- Enable IPv4 forwarding ---
+echo "📡 Enabling IPv4 forwarding..."
 cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
 net.ipv4.ip_forward = 1
 EOF
 sudo sysctl --system
 
-# --- Add Kubernetes & CRI-O repositories ---
-curl -fsSL https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/deb/Release.key | \
-    sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/deb/ /" | \
-    sudo tee /etc/apt/sources.list.d/kubernetes.list
+echo "📦 Adding Kubernetes and CRI-O repositories..."
+sudo mkdir -p /etc/apt/keyrings
 
-curl -fsSL https://pkgs.k8s.io/addons:/cri-o:/prerelease:/main/deb/Release.key | \
-    sudo gpg --dearmor -o /etc/apt/keyrings/cri-o-apt-keyring.gpg
-echo "deb [signed-by=/etc/apt/keyrings/cri-o-apt-keyring.gpg] https://pkgs.k8s.io/addons:/cri-o:/prerelease:/main/deb/ /" | \
-    sudo tee /etc/apt/sources.list.d/cri-o.list
+# Add Kubernetes repo
+curl -fsSL https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
 
-# --- Install kubelet, kubeadm, kubectl, cri-o ---
+# Add CRI-O repo
+curl -fsSL https://pkgs.k8s.io/addons:/cri-o:/prerelease:/main/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/cri-o-apt-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/cri-o-apt-keyring.gpg] https://pkgs.k8s.io/addons:/cri-o:/prerelease:/main/deb/ /" | sudo tee /etc/apt/sources.list.d/cri-o.list
+
+echo "📦 Installing CRI-O and Kubernetes components..."
 sudo apt-get update
 sudo apt-get install -y cri-o kubelet kubeadm kubectl
-sudo apt-mark hold kubelet kubeadm kubectl
+sudo apt-mark hold kubelet kubeadm kubectl  # Prevent accidental upgrades
 
-# --- Start CRI-O, delay kubelet ---
+echo "🚀 Starting services..."
+sudo systemctl daemon-reexec
 sudo systemctl enable --now crio
-sudo systemctl disable --now kubelet
+sudo systemctl enable kubelet
 
-# --- Disable swap ---
+echo "🛑 Disabling swap..."
 sudo swapoff -a
 (crontab -l 2>/dev/null; echo "@reboot /sbin/swapoff -a") | crontab -
 
-# --- Write kubeadm join script ---
-cat <<'EOF' | sudo tee /opt/k8s-join.sh
-#!/bin/bash
-set -e
+echo "🔑 Fetching kubeadm join command from AWS Secrets Manager..."
 
-echo "[k8s-join] 🔧 Running worker join script..." | tee -a /var/log/k8s-join.log
+# Retry fetching the join command (in case it isn't available yet)
+for attempt in {1..10}; do
+  JOIN_COMMAND=$(aws secretsmanager get-secret-value \
+    --region "$REGION" \
+    --secret-id "$SECRET_ID" \
+    --query SecretString \
+    --output text 2>/dev/null) && break
 
-if [ -f /etc/kubernetes/kubelet.conf ]; then
-  echo "✅ Already joined. Skipping." | tee -a /var/log/k8s-join.log
-  exit 0
-fi
+  echo "⏳ [$attempt] Secret not found yet. Retrying in 15s..."
+  sleep 15
+done
 
-sudo kubeadm reset -f | tee -a /var/log/k8s-join.log
-sudo rm -rf /etc/cni /var/lib/cni /var/lib/kubelet /etc/kubernetes
-
-JOIN_CMD=$(aws secretsmanager get-secret-value \
-  --secret-id K8S_JOIN_COMMAND \
-  --region us-west-1 \
-  --query SecretString \
-  --output text)
-
-if [ -z "$JOIN_CMD" ]; then
-  echo "❌ Join command not found." | tee -a /var/log/k8s-join.log
+# Fail if join command couldn't be retrieved
+if [ -z "$JOIN_COMMAND" ]; then
+  echo "❌ Failed to fetch join command. Exiting."
   exit 1
 fi
 
-FINAL_CMD="$JOIN_CMD --cri-socket unix:///var/run/crio/crio.sock"
-echo "🚀 Executing: $FINAL_CMD" | tee -a /var/log/k8s-join.log
-eval "$FINAL_CMD" | tee -a /var/log/k8s-join.log
-
-sudo systemctl start kubelet
-EOF
-
-sudo chmod +x /opt/k8s-join.sh
-
-# --- Create and enable systemd service ---
-cat <<EOF | sudo tee /etc/systemd/system/k8s-join.service
-[Unit]
-Description=Kubernetes Worker Auto Join
-After=network.target crio.service
-
-[Service]
-Type=oneshot
-ExecStart=/opt/k8s-join.sh
-RemainAfterExit=true
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl daemon-reexec
-sudo systemctl daemon-reload
-sudo systemctl enable k8s-join.service
-
-# --- Run join script immediately ---
-sudo /opt/k8s-join.sh || true
+echo "🤝 Joining the Kubernetes cluster..."
+eval "$JOIN_COMMAND"

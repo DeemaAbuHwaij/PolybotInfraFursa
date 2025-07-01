@@ -1,0 +1,33 @@
+# PURPOSE: This workflow regenerates the Kubernetes kubeadm join token every 12 hours
+# and updates it in AWS Secrets Manager, ensuring that new worker nodes can always join the cluster.
+
+name: Refresh K8s Join Token
+
+# This workflow runs on a schedule (every 12 hours) or can be triggered manually
+on:
+  schedule:
+    - cron: '0 */12 * * *'  # Every 12 hours
+  workflow_dispatch:        # Manual trigger
+
+jobs:
+  refresh-token:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: us-west-1  # Set the AWS region used for Secrets Manager
+
+    steps:
+      # Step 1: Connect to the control plane via SSH and run the refresh token script
+      - name: Refresh join token via SSH
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.CONTROL_PLANE_IP }}
+          username: ubuntu
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # Download and run the refresh token script
+            curl -O https://raw.githubusercontent.com/DeemaAbuHwaij/PolybotInfraFursa/main/scripts/refresh-k8s-join-token.sh
+            chmod +x refresh-k8s-join-token.sh
+
+            # Run the script with environment variables for AWS region and secret ID
+            AWS_REGION=us-west-1 SECRET_ID=deema-kubeadm-join-command ./refresh-k8s-join-token.sh
