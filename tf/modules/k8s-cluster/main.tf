@@ -240,7 +240,7 @@ resource "aws_launch_template" "worker_lt" {
 # ✅ Auto Scaling Group for worker nodes
 resource "aws_autoscaling_group" "worker_asg" {
   name                = "k8s-worker-asg-${var.env}"
-  desired_capacity    = 1
+  desired_capacity    = 0
   max_size            = 3
   min_size            = 0
   vpc_zone_identifier = aws_subnet.public_subnets[*].id
