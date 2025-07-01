@@ -1,5 +1,12 @@
+# PURPOSE: This file defines all input variables used by the root Terraform module and passes them to the Kubernetes infrastructure module.
+
 variable "env" {
-  description = "Deployment environment"
+  description = "Deployment environment (e.g., dev, prod)"
+  type        = string
+}
+
+variable "region" {
+  description = "AWS region for the infrastructure"
   type        = string
 }
 
@@ -9,7 +16,7 @@ variable "ami_id" {
 }
 
 variable "instance_type" {
-  description = "EC2 instance type"
+  description = "EC2 instance type for control plane and worker nodes"
   type        = string
 }
 
@@ -28,3 +35,17 @@ variable "azs" {
   type        = list(string)
 }
 
+variable "desired_capacity" {
+  description = "Desired number of worker nodes in the ASG"
+  type        = number
+}
+
+variable "min_size" {
+  description = "Minimum number of worker nodes in the ASG"
+  type        = number
+}
+
+variable "max_size" {
+  description = "Maximum number of worker nodes in the ASG"
+  type        = number
+}
