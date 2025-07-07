@@ -1,16 +1,17 @@
 #!/bin/bash
 
-# Stop and remove existing container if running
-sudo docker stop mynginx || true
-sudo docker rm mynginx || true
+# This script sets up an NGINX Ingress Controller on the control plane node
 
-# Ensure config and certs directories exist
-mkdir -p /home/ubuntu/conf.d
-mkdir -p /home/ubuntu/certs
+echo "[INFO] Deploying NGINX Ingress Controller..."
 
-# Run the Nginx container with volumes
-sudo docker run -d --name mynginx \
-  -p 443:443 \
-  -v /home/ubuntu/conf.d:/etc/nginx/conf.d/ \
-  -v /home/ubuntu/certs:/etc/nginx/certs/ \
-  nginx
+# Create namespace for ingress if not exists
+kubectl get ns ingress-nginx >/dev/null 2>&1 || kubectl create ns ingress-nginx
+
+# Apply official NGINX ingress controller manifests
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.9.5/deploy/static/provider/cloud/deploy.yaml
+
+# Wait for the ingress controller pods to be ready
+echo "[INFO] Waiting for ingress controller to be ready..."
+kubectl wait --namespace ingress-nginx   --for=condition=Ready pod   --selector=app.kubernetes.io/component=controller   --timeout=300s
+
+echo "[INFO] NGINX Ingress Controller deployed successfully!"

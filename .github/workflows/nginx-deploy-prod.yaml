@@ -1,34 +1,31 @@
-name: Deploy Nginx Container to Prod
+name: Deploy NGINX & Polybot (Prod)
 
 on:
   push:
     paths:
-      - "nginx-config/polybot-prod.conf"
-      - "scripts/deploy_nginx_container.sh"
-    branches:
-      - main
+      - 'k8s/**'
+      - '.github/workflows/nginx-deploy-prod.yaml'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - name: Checkout Repo
+      uses: actions/checkout@v3
 
-    - name: Set up SSH key
+    - name: Set up Kubeconfig
       run: |
-        echo "${{ secrets.SSH_PRIVATE_KEY }}" > key.pem
-        chmod 600 key.pem
+        mkdir -p ~/.kube
+        echo "${{ secrets.KUBECONFIG_DEV }}" | base64 -d > ~/.kube/config
 
-    - name: Copy Nginx config + deploy script to Prod EC2
-      run: |
-        scp -i key.pem -o StrictHostKeyChecking=no nginx-config/polybot-prod.conf ubuntu@${{ secrets.PROD_HOST }}:/home/ubuntu/conf.d/
-        scp -i key.pem -o StrictHostKeyChecking=no scripts/deploy_nginx_container.sh ubuntu@${{ secrets.PROD_HOST }}:/home/ubuntu/
+        chmod 600 ~/.kube/config
 
-    - name: Run Nginx Docker container on Prod EC2
+    - name: Apply Namespace & Polybot (Prod)
       run: |
-        ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.PROD_HOST }} << 'EOF'
-          chmod +x /home/ubuntu/deploy_nginx_container.sh
-          bash /home/ubuntu/deploy_nginx_container.sh
-        EOF
+        kubectl apply -f k8s/namespaces/prod.yaml
+        kubectl apply -f k8s/Polybot/deployment.yaml -n prod
+
+    - name: Apply Ingress (Prod)
+      run: |
+        kubectl apply -f k8s/Polybot/ingress.yaml -n prod

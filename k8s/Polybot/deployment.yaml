@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: polybot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: polybot
+  template:
+    metadata:
+      labels:
+        app: polybot
+    spec:
+      containers:
+        - name: polybot
+          image: deemaa/polybot-dev:118
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: polybot-env
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: polybot-service
+spec:
+  selector:
+    app: polybot
+  ports:
+    - port: 8000
+      targetPort: 8000
