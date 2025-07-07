@@ -1,30 +1,34 @@
-name: Deploy NGINX & Polybot (Dev)
+name: Deploy Nginx Container to Dev
 
 on:
   push:
     paths:
-      - 'k8s/**'
-      - '.github/workflows/nginx-deploy-dev.yaml'
+      - "nginx-config/polybot-dev.conf"
+      - "scripts/deploy_nginx_container.sh"
+    branches:
+      - dev
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Repo
-      uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-    - name: Set up Kubeconfig
+    - name: Set up SSH key
       run: |
-        mkdir -p ~/.kube
-        echo "${{ secrets.KUBECONFIG_DEV }}" > ~/.kube/config
-        chmod 600 ~/.kube/config
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > key.pem
+        chmod 600 key.pem
 
-    - name: Apply Namespace & Polybot (Dev)
+    - name: Copy Nginx config + deploy script to Dev EC2
       run: |
-        kubectl apply -f k8s/namespaces/dev.yaml
-        kubectl apply -f k8s/Polybot/deployment.yaml -n dev
+        scp -i key.pem -o StrictHostKeyChecking=no nginx-config/polybot-dev.conf ubuntu@${{ secrets.DEV_HOST }}:/home/ubuntu/conf.d/
+        scp -i key.pem -o StrictHostKeyChecking=no scripts/deploy_nginx_container.sh ubuntu@${{ secrets.DEV_HOST }}:/home/ubuntu/
 
-    - name: Apply Ingress (Dev)
+    - name: Run Nginx Docker container on Dev EC2
       run: |
-        kubectl apply -f k8s/Polybot/ingress.yaml -n dev
+        ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.DEV_HOST }} << 'EOF'
+          chmod +x /home/ubuntu/deploy_nginx_container.sh
+          bash /home/ubuntu/deploy_nginx_container.sh
+        EOF
