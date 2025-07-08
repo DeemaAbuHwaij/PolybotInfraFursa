@@ -18,3 +18,23 @@ spec:
           image: deemaa/yolo-prod:39
           ports:
             - containerPort: 5000
+          resources: # ✅ required for HPA
+            requests:
+              cpu: "100m"
+            limits:
+              cpu: "500m"
+
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: yolo-service
+  namespace: prod
+spec:
+  selector:
+    app: yolo
+  ports:
+    - port: 5000
+      targetPort: 5000

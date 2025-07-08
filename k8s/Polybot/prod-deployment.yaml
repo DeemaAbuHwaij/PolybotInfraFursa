@@ -2,8 +2,11 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: polybot
+  namespace: prod
+  labels:
+    app: polybot
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: polybot
@@ -14,7 +17,7 @@ spec:
     spec:
       containers:
         - name: polybot
-          image: deemaa/polybot-dev:118
+          image: deemaa/polybot-prod:latest
           ports:
             - containerPort: 8000
           envFrom:
@@ -25,6 +28,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: polybot-service
+  namespace: prod
 spec:
   selector:
     app: polybot
