@@ -1,8 +1,6 @@
-############################################
 # PURPOSE: Complete Kubernetes Infrastructure
 # This file defines VPC, networking, EC2 instances,
 # IAM, Load Balancer, and access for S3/SQS/DynamoDB.
-############################################
 
 # ✅ VPC
 resource "aws_vpc" "k8s_vpc" {
@@ -64,6 +62,49 @@ resource "aws_iam_role" "control_plane_role" {
   })
 }
 
+# ✅ Custom Policies
+resource "aws_iam_policy" "s3_bot_policy" {
+  name   = "deema-s3-bot-policy-${var.env}"
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = ["s3:*"],
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_policy" "yolo_sqs_policy" {
+  name   = "deema-sqs-policy-${var.env}"
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = ["sqs:*"],
+        Resource = var.sqs_queue_arn
+      }
+    ]
+  })
+}
+
+resource "aws_iam_policy" "yolo_dynamodb_policy" {
+  name   = "deema-ddb-policy-${var.env}"
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = ["dynamodb:*"],
+        Resource = var.dynamodb_table_arn
+      }
+    ]
+  })
+}
+
 # ✅ Attach IAM Policies
 resource "aws_iam_role_policy_attachment" "ssm_attach" {
   role       = aws_iam_role.control_plane_role.name
@@ -89,6 +130,21 @@ resource "aws_iam_role_policy_attachment" "ddb_attach" {
 resource "aws_iam_instance_profile" "instance_profile" {
   name = "deema-k8s-profile"
   role = aws_iam_role.control_plane_role.name
+}
+
+# ✅ EC2 Instance (Control Plane)
+resource "aws_instance" "control_plane" {
+  ami                         = var.ami_id
+  instance_type               = var.instance_type
+  key_name                    = var.key_name
+  subnet_id                   = aws_subnet.public_subnets[0].id
+  associate_public_ip_address = true
+  vpc_security_group_ids      = [aws_security_group.control_plane_sg.id]
+  iam_instance_profile        = aws_iam_instance_profile.instance_profile.name
+
+  tags = {
+    Name = "deema-control-plane-${var.env}"
+  }
 }
 
 # ✅ Security Groups
