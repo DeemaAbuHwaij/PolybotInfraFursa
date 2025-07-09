@@ -167,7 +167,7 @@ resource "aws_instance" "control_plane" {
 
 # ✅ Security Groups
 resource "aws_security_group" "control_plane_sg" {
-  name   = "control-plane-sg"
+  name   = "k8s-deema-control-plane-sg"
   vpc_id = aws_vpc.k8s_vpc.id
 
   lifecycle {
@@ -219,7 +219,7 @@ resource "aws_security_group" "control_plane_sg" {
 }
 
 resource "aws_security_group" "worker_sg" {
-  name   = "worker-sg"
+  name   = "k8s-deema-worker-sg"
   vpc_id = aws_vpc.k8s_vpc.id
 
   lifecycle {
@@ -257,7 +257,7 @@ resource "aws_security_group" "worker_sg" {
 }
 
 resource "aws_security_group" "lb_sg" {
-  name   = "lb-sg"
+  name   = "k8s-deema-lb-sg"
   vpc_id = aws_vpc.k8s_vpc.id
 
   ingress {
