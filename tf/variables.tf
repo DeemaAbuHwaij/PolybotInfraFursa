@@ -75,3 +75,8 @@ variable "sqs_queue_arn" {
   description = "ARN of the SQS queue used by the YOLO service"
   type        = string
 }
+
+variable "worker_instance_type" {
+  description = "EC2 instance type for worker nodes"
+  default     = "t3.medium"
+}
