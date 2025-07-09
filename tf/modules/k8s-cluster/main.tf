@@ -49,9 +49,22 @@ resource "aws_route_table_association" "public_assoc" {
   route_table_id = aws_route_table.public_rt.id
 }
 
-# ✅ IAM Role for EC2
+# ✅ IAM Role for EC2 - Control Plane
 resource "aws_iam_role" "control_plane_role" {
-  name = "deema-k8s-role"
+  name = "deema-k8s-control-plane-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Action = "sts:AssumeRole",
+      Effect = "Allow",
+      Principal = { Service = "ec2.amazonaws.com" }
+    }]
+  })
+}
+
+# ✅ IAM Role for EC2 - Worker
+resource "aws_iam_role" "worker_role" {
+  name = "deema-k8s-worker-role"
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
@@ -117,19 +130,24 @@ resource "aws_iam_role_policy_attachment" "s3_attach" {
 }
 
 resource "aws_iam_role_policy_attachment" "sqs_attach" {
-  role       = aws_iam_role.control_plane_role.name
+  role       = aws_iam_role.worker_role.name
   policy_arn = aws_iam_policy.yolo_sqs_policy.arn
 }
 
 resource "aws_iam_role_policy_attachment" "ddb_attach" {
-  role       = aws_iam_role.control_plane_role.name
+  role       = aws_iam_role.worker_role.name
   policy_arn = aws_iam_policy.yolo_dynamodb_policy.arn
 }
 
-# ✅ Instance Profile
+# ✅ Instance Profiles
 resource "aws_iam_instance_profile" "instance_profile" {
-  name = "deema-k8s-profile"
+  name = "deema-k8s-control-plane-profile"
   role = aws_iam_role.control_plane_role.name
+}
+
+resource "aws_iam_instance_profile" "worker_profile" {
+  name = "deema-k8s-worker-profile"
+  role = aws_iam_role.worker_role.name
 }
 
 # ✅ EC2 Instance (Control Plane)
