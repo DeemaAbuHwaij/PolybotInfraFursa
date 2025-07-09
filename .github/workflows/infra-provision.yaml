@@ -49,3 +49,4 @@ jobs:
       - name: Terraform Apply
         working-directory: tf
         run: terraform apply -auto-approve -var-file="region.us-west-1.tfvars"
+
