@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      CONTROL_PLANE_TAG_NAME: control-plane
+      CONTROL_PLANE_IP: ${{ secrets.CONTROL_PLANE_IP }}
       REGION: us-west-1
 
     steps:
@@ -27,17 +27,6 @@ jobs:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.REGION }}
-
-    - name: Get Control Plane IP by EC2 tag
-      id: get-ip
-      run: |
-        echo "🔍 Finding control plane IP by tag..."
-        CONTROL_PLANE_IP=$(aws ec2 describe-instances \
-          --filters "Name=tag:Name,Values=${{ env.CONTROL_PLANE_TAG_NAME }}" "Name=instance-state-name,Values=running" \
-          --query "Reservations[0].Instances[0].PublicIpAddress" \
-          --output text)
-        echo "✅ Found IP: $CONTROL_PLANE_IP"
-        echo "CONTROL_PLANE_IP=$CONTROL_PLANE_IP" >> $GITHUB_ENV
 
     - name: Save SSH private key to file
       run: |
