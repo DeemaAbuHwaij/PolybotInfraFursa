@@ -6,7 +6,7 @@
 resource "aws_vpc" "k8s_vpc" {
   cidr_block = "10.0.0.0/16"
   tags = {
-    Name = "deema-k8s-vpc-${var.env}"
+    Name = "k8s-deema-vpc-${var.env}"
   }
 }
 
@@ -25,7 +25,7 @@ resource "aws_subnet" "public_subnets" {
   cidr_block        = cidrsubnet("10.0.0.0/16", 8, count.index)
   availability_zone = var.azs[count.index]
   tags = {
-    Name = "deema-public-subnet-${count.index}-${var.env}"
+    Name = "k8s-deema-public-subnet-${count.index}-${var.env}"
   }
 }
 
@@ -33,7 +33,7 @@ resource "aws_subnet" "public_subnets" {
 resource "aws_route_table" "public_rt" {
   vpc_id = aws_vpc.k8s_vpc.id
   tags = {
-    Name = "deema-public-rt-${var.env}"
+    Name = "k8s-deema-public-rt-${var.env}"
   }
 }
 
@@ -51,7 +51,7 @@ resource "aws_route_table_association" "public_assoc" {
 
 # ✅ IAM Role for EC2 - Control Plane
 resource "aws_iam_role" "control_plane_role" {
-  name = "deema-k8s-control-plane-role"
+  name = "k8s-deema-control-plane-role"
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
@@ -64,7 +64,7 @@ resource "aws_iam_role" "control_plane_role" {
 
 # ✅ IAM Role for EC2 - Worker
 resource "aws_iam_role" "worker_role" {
-  name = "deema-k8s-worker-role"
+  name = "k8s-deema-worker-role"
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
@@ -77,7 +77,7 @@ resource "aws_iam_role" "worker_role" {
 
 # ✅ Custom Policies
 resource "aws_iam_policy" "s3_bot_policy" {
-  name   = "deema-s3-bot-policy-${var.env}"
+  name   = "k8s-deema-s3-bot-policy-${var.env}"
   policy = jsonencode({
     Version = "2012-10-17",
     Statement = [
@@ -91,7 +91,7 @@ resource "aws_iam_policy" "s3_bot_policy" {
 }
 
 resource "aws_iam_policy" "yolo_sqs_policy" {
-  name   = "deema-sqs-policy-${var.env}"
+  name   = "k8s-deema-sqs-policy-${var.env}"
   policy = jsonencode({
     Version = "2012-10-17",
     Statement = [
@@ -105,7 +105,7 @@ resource "aws_iam_policy" "yolo_sqs_policy" {
 }
 
 resource "aws_iam_policy" "yolo_dynamodb_policy" {
-  name   = "deema-ddb-policy-${var.env}"
+  name   = "k8s-deema-ddb-policy-${var.env}"
   policy = jsonencode({
     Version = "2012-10-17",
     Statement = [
@@ -161,7 +161,7 @@ resource "aws_instance" "control_plane" {
   iam_instance_profile        = aws_iam_instance_profile.instance_profile.name
 
   tags = {
-    Name = "deema-control-plane-${var.env}"
+    Name = "k8s-deema-control-plane-${var.env}"
   }
 }
 
