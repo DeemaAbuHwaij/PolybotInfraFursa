@@ -141,12 +141,12 @@ resource "aws_iam_role_policy_attachment" "ddb_attach" {
 
 # ✅ Instance Profiles
 resource "aws_iam_instance_profile" "instance_profile" {
-  name = "deema-k8s-control-plane-profile"
+  name = "k8s-deema-control-plane-profile"
   role = aws_iam_role.control_plane_role.name
 }
 
 resource "aws_iam_instance_profile" "worker_profile" {
-  name = "deema-k8s-worker-profile"
+  name = "k8s-deema-worker-profile"
   role = aws_iam_role.worker_role.name
 }
 
@@ -221,6 +221,11 @@ resource "aws_security_group" "control_plane_sg" {
 resource "aws_security_group" "worker_sg" {
   name   = "worker-sg"
   vpc_id = aws_vpc.k8s_vpc.id
+
+  lifecycle {
+  create_before_destroy = true
+  }
+
 
   ingress {
     from_port   = 22
