@@ -22,10 +22,10 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
         with:
-          terraform_version: 1.7.5  # ✅ updated to match your code requirements
+          terraform_version: 1.7.5
 
       - name: Terraform Init
         working-directory: tf
