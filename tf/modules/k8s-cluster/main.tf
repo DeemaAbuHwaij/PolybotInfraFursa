@@ -141,12 +141,12 @@ resource "aws_iam_role_policy_attachment" "ddb_attach" {
 
 # ✅ Instance Profiles
 resource "aws_iam_instance_profile" "instance_profile" {
-  name = "k8s-deema-control-plane-profile"
+  name = "k8s--deema-control-plane-profile"
   role = aws_iam_role.control_plane_role.name
 }
 
 resource "aws_iam_instance_profile" "worker_profile" {
-  name = "k8s-deema-worker-profile"
+  name = "k8s--deema-worker-profile"
   role = aws_iam_role.worker_role.name
 }
 
