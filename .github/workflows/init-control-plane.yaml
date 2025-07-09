@@ -52,3 +52,4 @@ jobs:
               --secret-id deema-kubeadm-join-command \
               --secret-string file:///tmp/k8s_join.sh \
               --region us-west-1
+
