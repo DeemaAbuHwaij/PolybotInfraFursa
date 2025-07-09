@@ -289,3 +289,121 @@ resource "aws_security_group" "lb_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
+
+# ✅ Launch Template for Worker Nodes
+resource "aws_launch_template" "worker" {
+  name_prefix   = "k8s-worker"
+  image_id      = var.ami_id
+  instance_type = var.instance_type
+  key_name      = var.key_name
+
+  iam_instance_profile {
+    name = aws_iam_instance_profile.worker_profile.name
+  }
+
+  user_data = base64encode(file("${path.module}/user_data_worker.sh"))
+
+  network_interfaces {
+    associate_public_ip_address = true
+    security_groups = [
+      aws_security_group.control_plane_sg.id,
+      aws_security_group.worker_sg.id
+    ]
+  }
+
+  tag_specifications {
+    resource_type = "instance"
+
+    tags = {
+      Name = "k8s-worker"
+    }
+  }
+}
+
+# ✅ Auto Scaling Group for Worker Nodes
+resource "aws_autoscaling_group" "worker_asg" {
+  name                      = "k8s-worker-asg"
+  max_size                  = var.max_size
+  min_size                  = var.min_size
+  desired_capacity          = var.desired_capacity
+  health_check_type         = "EC2"
+  force_delete              = true
+  vpc_zone_identifier       = [for subnet in aws_subnet.public_subnets : subnet.id]
+
+  launch_template {
+    id      = aws_launch_template.worker.id
+    version = "$Latest"
+  }
+
+  tag {
+    key                 = "Name"
+    value               = "k8s-worker"
+    propagate_at_launch = true
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# ✅ Load Balancer
+resource "aws_lb" "k8s_lb" {
+  name               = "k8s-lb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.lb_sg.id]
+  subnets            = [for subnet in aws_subnet.public_subnets : subnet.id]
+
+  tags = {
+    Name = "k8s-lb"
+  }
+}
+
+# ✅ Target Group
+resource "aws_lb_target_group" "nginx_nodeport_tg" {
+  name        = "nginx-nodeport-tg"
+  port        = 31981
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.k8s_vpc.id
+  target_type = "instance"
+
+  health_check {
+    path                = "/healthz"
+    matcher             = "200-399"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
+}
+
+# ✅ HTTPS Listener
+resource "aws_lb_listener" "https_listener" {
+  load_balancer_arn = aws_lb.k8s_lb.arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-2016-08"
+  certificate_arn   = var.acm_cert_arn
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.nginx_nodeport_tg.arn
+  }
+}
+
+# ✅ Attach Worker ASG to LB Target Group
+resource "aws_autoscaling_attachment" "nginx_asg_lb_attachment" {
+  autoscaling_group_name = aws_autoscaling_group.worker_asg.name
+  lb_target_group_arn    = aws_lb_target_group.nginx_nodeport_tg.arn
+}
+
+# ✅ Allow Worker-to-Worker Communication
+resource "aws_security_group_rule" "allow_worker_to_worker_all" {
+  type                     = "ingress"
+  from_port                = 0
+  to_port                  = 0
+  protocol                 = "-1"
+  security_group_id        = aws_security_group.worker_sg.id
+  source_security_group_id = aws_security_group.worker_sg.id
+  description              = "Allow all traffic between worker nodes"
+}
