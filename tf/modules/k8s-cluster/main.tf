@@ -150,6 +150,8 @@ resource "aws_iam_instance_profile" "worker_profile" {
   role = aws_iam_role.worker_role.name
 }
 
+
+
 # ✅ EC2 Instance (Control Plane)
 resource "aws_instance" "control_plane" {
   ami                         = var.ami_id
@@ -164,6 +166,19 @@ resource "aws_instance" "control_plane" {
     Name = "k8s-deema-control-plane-${var.env}"
   }
 }
+
+
+
+# ✅ Elastic IP
+resource "aws_eip" "control_plane_eip" {
+  instance = aws_instance.control_plane.id
+  vpc      = true
+
+  tags = {
+    Name = "k8s-deema-control-plane-eip-${var.env}"
+  }
+}
+
 
 # ✅ Security Groups
 resource "aws_security_group" "control_plane_sg" {
