@@ -170,6 +170,11 @@ resource "aws_security_group" "control_plane_sg" {
   name   = "control-plane-sg"
   vpc_id = aws_vpc.k8s_vpc.id
 
+  lifecycle {
+  create_before_destroy = true
+  }
+
+
   ingress {
     from_port   = 22
     to_port     = 22
