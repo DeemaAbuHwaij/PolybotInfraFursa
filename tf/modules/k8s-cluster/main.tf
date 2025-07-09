@@ -322,7 +322,7 @@ resource "aws_launch_template" "worker" {
 
 # ✅ Auto Scaling Group for Worker Nodes
 resource "aws_autoscaling_group" "worker_asg" {
-  name                      = "k8s-worker-asg"
+  name                      = "k8s-deema-worker-asg"
   max_size                  = var.max_size
   min_size                  = var.min_size
   desired_capacity          = var.desired_capacity
