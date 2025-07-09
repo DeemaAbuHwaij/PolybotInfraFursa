@@ -96,164 +96,97 @@ resource "aws_security_group" "control_plane_sg" {
   name   = "control-plane-sg"
   vpc_id = aws_vpc.k8s_vpc.id
 
-  ingress { from_port = 22 to_port = 22 protocol = "tcp" cidr_blocks = ["0.0.0.0/0"] }
-  ingress { from_port = 6443 to_port = 6443 protocol = "tcp" cidr_blocks = [var.vpc_cidr] }
-  ingress { from_port = 10250 to_port = 10250 protocol = "tcp" cidr_blocks = [var.vpc_cidr] }
-  ingress { from_port = 179 to_port = 179 protocol = "tcp" cidr_blocks = [var.vpc_cidr] }
-  ingress { from_port = 0 to_port = 0 protocol = "-1" cidr_blocks = [var.vpc_cidr] }
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
-  egress { from_port = 0 to_port = 0 protocol = "-1" cidr_blocks = ["0.0.0.0/0"] }
+  ingress {
+    from_port   = 6443
+    to_port     = 6443
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  ingress {
+    from_port   = 10250
+    to_port     = 10250
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  ingress {
+    from_port   = 179
+    to_port     = 179
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  ingress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 }
 
 resource "aws_security_group" "worker_sg" {
   name   = "worker-sg"
   vpc_id = aws_vpc.k8s_vpc.id
 
-  ingress { from_port = 22 to_port = 22 protocol = "tcp" cidr_blocks = ["0.0.0.0/0"] }
-  ingress { from_port = 31981 to_port = 31981 protocol = "tcp" cidr_blocks = ["0.0.0.0/0"] }
-  ingress { from_port = 0 to_port = 0 protocol = "-1" cidr_blocks = [var.vpc_cidr] }
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
-  egress { from_port = 0 to_port = 0 protocol = "-1" cidr_blocks = ["0.0.0.0/0"] }
+  ingress {
+    from_port   = 31981
+    to_port     = 31981
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 }
 
 resource "aws_security_group" "lb_sg" {
   name   = "lb-sg"
   vpc_id = aws_vpc.k8s_vpc.id
-  ingress { from_port = 443 to_port = 443 protocol = "tcp" cidr_blocks = ["0.0.0.0/0"] }
-  egress { from_port = 0 to_port = 0 protocol = "-1" cidr_blocks = ["0.0.0.0/0"] }
-}
 
-# ✅ EC2 Control Plane
-resource "aws_instance" "control_plane" {
-  ami                         = var.ami_id
-  instance_type               = var.instance_type
-  subnet_id                   = aws_subnet.public_subnets[0].id
-  vpc_security_group_ids      = [aws_security_group.control_plane_sg.id]
-  associate_public_ip_address = true
-  key_name                    = var.key_name
-  iam_instance_profile        = aws_iam_instance_profile.instance_profile.name
-  user_data                   = file("${path.module}/user_data_control_plane.sh")
-  tags = { Name = "control-plane" }
-}
-
-# ✅ Worker Launch Template
-resource "aws_launch_template" "worker" {
-  name_prefix   = "worker-"
-  image_id      = var.ami_id
-  instance_type = var.instance_type
-  key_name      = var.key_name
-
-  iam_instance_profile { name = aws_iam_instance_profile.instance_profile.name }
-  user_data = base64encode(file("${path.module}/user_data_worker.sh"))
-
-  network_interfaces {
-    associate_public_ip_address = true
-    security_groups = [aws_security_group.worker_sg.id, aws_security_group.control_plane_sg.id]
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tag_specifications {
-    resource_type = "instance"
-    tags = { Name = "worker" }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
   }
-}
-
-# ✅ Worker ASG
-resource "aws_autoscaling_group" "worker_asg" {
-  name                = "worker-asg"
-  desired_capacity    = var.desired_capacity
-  min_size            = var.min_size
-  max_size            = var.max_size
-  vpc_zone_identifier = aws_subnet.public_subnets[*].id
-  health_check_type   = "EC2"
-
-  launch_template {
-    id      = aws_launch_template.worker.id
-    version = "$Latest"
-  }
-
-  tag {
-    key                 = "Name"
-    value               = "worker"
-    propagate_at_launch = true
-  }
-}
-
-# ✅ Load Balancer + Target Group
-resource "aws_lb" "k8s_lb" {
-  name               = "k8s-lb"
-  internal           = false
-  load_balancer_type = "application"
-  subnets            = aws_subnet.public_subnets[*].id
-  security_groups    = [aws_security_group.lb_sg.id]
-}
-
-resource "aws_lb_target_group" "nginx_nodeport_tg" {
-  name     = "nginx-tg"
-  port     = 31981
-  protocol = "HTTP"
-  vpc_id   = aws_vpc.k8s_vpc.id
-
-  health_check {
-    path                = "/healthz"
-    matcher             = "200-399"
-    interval            = 30
-    timeout             = 5
-    healthy_threshold   = 2
-    unhealthy_threshold = 2
-  }
-}
-
-resource "aws_lb_listener" "https_listener" {
-  load_balancer_arn = aws_lb.k8s_lb.arn
-  port              = 443
-  protocol          = "HTTPS"
-  ssl_policy        = "ELBSecurityPolicy-2016-08"
-  certificate_arn   = var.acm_cert_arn
-
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.nginx_nodeport_tg.arn
-  }
-}
-
-resource "aws_autoscaling_attachment" "asg_lb_attach" {
-  autoscaling_group_name = aws_autoscaling_group.worker_asg.name
-  lb_target_group_arn    = aws_lb_target_group.nginx_nodeport_tg.arn
-}
-
-# ✅ S3, SQS, DynamoDB Policies
-resource "aws_iam_policy" "s3_bot_policy" {
-  name   = "ImageBotS3Access"
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [{
-      Effect   = "Allow",
-      Action   = ["s3:PutObject", "s3:GetObject"],
-      Resource = "arn:aws:s3:::${var.s3_bucket_name}/*"
-    }]
-  })
-}
-
-resource "aws_iam_policy" "yolo_sqs_policy" {
-  name   = "YoloSQSAccess"
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [{
-      Effect   = "Allow",
-      Action   = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"],
-      Resource = var.sqs_queue_arn
-    }]
-  })
-}
-
-resource "aws_iam_policy" "yolo_dynamodb_policy" {
-  name   = "YoloDynamoDBAccess"
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [{
-      Effect   = "Allow",
-      Action   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem"],
-      Resource = var.dynamodb_table_arn
-    }]
-  })
 }
