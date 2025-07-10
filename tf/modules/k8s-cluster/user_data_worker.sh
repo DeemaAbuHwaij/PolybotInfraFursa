@@ -1,10 +1,9 @@
 #!/bin/bash
-# PURPOSE: This script installs CRI-O and Kubernetes components on a worker EC2 instance
-# and joins it to the Kubernetes cluster using a join command securely fetched from AWS Secrets Manager.
+# PURPOSE: Install CRI-O and Kubernetes, then auto-join the cluster using systemd service that fetches join command from Secrets Manager
 
-set -e  # Exit immediately if a command fails
+set -e
 
-# Set Kubernetes version and AWS Secrets Manager details
+# Variables
 KUBERNETES_VERSION=v1.32
 REGION="us-west-1"
 SECRET_ID="deema-kubeadm-join-command"
@@ -38,42 +37,49 @@ echo "deb [signed-by=/etc/apt/keyrings/cri-o-apt-keyring.gpg] https://pkgs.k8s.i
 echo "📦 Installing CRI-O and Kubernetes components..."
 sudo apt-get update
 sudo apt-get install -y cri-o kubelet kubeadm kubectl
-sudo apt-mark hold kubelet kubeadm kubectl  # Prevent accidental upgrades
+sudo apt-mark hold kubelet kubeadm kubectl
 
 echo "🚀 Starting services..."
 sudo systemctl daemon-reexec
 sudo systemctl enable --now crio
 sudo systemctl enable kubelet
 
-echo "🛑 Disabling swap..."
+echo "🛑 Disabling swap permanently..."
 sudo swapoff -a
 (crontab -l 2>/dev/null; echo "@reboot /sbin/swapoff -a") | crontab -
 
-echo "🔑 Fetching kubeadm join command from AWS Secrets Manager..."
+echo "📝 Writing join script to /usr/local/bin/join_cluster.sh..."
+cat <<'EOL' | sudo tee /usr/local/bin/join_cluster.sh
+#!/bin/bash
+set -e
 
-# Retry fetching the join command (in case it isn't available yet)
-for attempt in {1..10}; do
+REGION="us-west-1"
+SECRET_ID="deema-kubeadm-join-command"
+LOG_FILE="/var/log/k8s-worker-join.log"
+
+echo "[INFO] Starting join process..." | tee -a $LOG_FILE
+
+while true; do
   JOIN_COMMAND=$(aws secretsmanager get-secret-value \
     --region "$REGION" \
     --secret-id "$SECRET_ID" \
     --query SecretString \
-    --output text 2>/dev/null) && break
+    --output text 2>/dev/null)
 
-  echo "⏳ [$attempt] Secret not found yet. Retrying in 15s..."
+  if [ -n "$JOIN_COMMAND" ]; then
+    echo "[INFO] Successfully retrieved join command. Executing..." | tee -a $LOG_FILE
+    eval "$JOIN_COMMAND" | tee -a $LOG_FILE
+    break
+  fi
+
+  echo "[WARN] Join command not available yet. Retrying in 15s..." | tee -a $LOG_FILE
   sleep 15
 done
+EOL
 
-# Fail if join command couldn't be retrieved
-if [ -z "$JOIN_COMMAND" ]; then
-  echo "❌ Failed to fetch join command. Exiting."
-  exit 1
-fi
+chmod +x /usr/local/bin/join_cluster.sh
 
-echo "🤝 Joining the Kubernetes cluster..."
-eval "$JOIN_COMMAND"
-
-
-# Create a systemd service to run the join command at boot
+echo "🔧 Creating systemd service for auto-join..."
 cat <<EOF | sudo tee /etc/systemd/system/k8s-join.service
 [Unit]
 Description=Join Kubernetes cluster
@@ -82,36 +88,13 @@ After=network.target crio.service
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/join_cluster.sh
+Restart=on-failure
+RestartSec=30
 RemainAfterExit=true
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-# Save your join logic into a script
-cat <<'EOL' | sudo tee /usr/local/bin/join_cluster.sh
-#!/bin/bash
-set -e
-REGION="us-west-1"
-SECRET_ID="deema-kubeadm-join-command"
-
-for attempt in {1..10}; do
-  JOIN_COMMAND=$(aws secretsmanager get-secret-value \
-    --region "$REGION" \
-    --secret-id "$SECRET_ID" \
-    --query SecretString \
-    --output text 2>/dev/null) && break
-  sleep 15
-done
-
-if [ -z "$JOIN_COMMAND" ]; then
-  echo "❌ Failed to fetch join command"
-  exit 1
-fi
-
-eval "$JOIN_COMMAND"
-EOL
-
-chmod +x /usr/local/bin/join_cluster.sh
 sudo systemctl daemon-reexec
 sudo systemctl enable --now k8s-join.service
