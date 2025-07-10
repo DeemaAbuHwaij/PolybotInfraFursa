@@ -1,49 +1,77 @@
 #!/bin/bash
-set -e
+# PURPOSE: Install CRI-O + Kubernetes on the control plane, apply Flannel, and store join token in AWS Secrets Manager.
 
-echo "📦 Starting control-plane initialization..."
+set -e  # Exit on any error
 
-# Only initialize if not already done
+KUBERNETES_VERSION=v1.32
+AWS_REGION=us-west-1
+SECRET_NAME=deema-kubeadm-join-command
+
+echo "🧩 Installing base dependencies..."
+sudo apt-get update
+sudo apt-get install -y jq unzip ebtables ethtool software-properties-common apt-transport-https ca-certificates curl gpg
+
+echo "🔐 Installing AWS CLI..."
+curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip -q awscliv2.zip
+sudo ./aws/install --update
+
+echo "📡 Enabling IPv4 forwarding..."
+echo 'net.ipv4.ip_forward = 1' | sudo tee /etc/sysctl.d/k8s.conf
+sudo sysctl --system
+
+echo "📦 Adding APT keyrings and repositories..."
+sudo mkdir -p /etc/apt/keyrings
+
+# Kubernetes
+curl -fsSL https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+# CRI-O
+curl -fsSL https://pkgs.k8s.io/addons:/cri-o:/prerelease:/main/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/cri-o-apt-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/cri-o-apt-keyring.gpg] https://pkgs.k8s.io/addons:/cri-o:/prerelease:/main/deb/ /" | sudo tee /etc/apt/sources.list.d/cri-o.list
+
+echo "📦 Installing CRI-O and Kubernetes components..."
+sudo apt-get update
+sudo apt-get install -y cri-o kubelet kubeadm kubectl
+sudo apt-mark hold kubelet kubeadm kubectl
+
+echo "🚀 Enabling system services..."
+sudo systemctl daemon-reexec
+sudo systemctl enable --now crio
+sudo systemctl enable --now kubelet
+
+echo "🛑 Disabling swap..."
+sudo swapoff -a
+(crontab -l 2>/dev/null; echo "@reboot /sbin/swapoff -a") | crontab -
+
 if [ ! -f /etc/kubernetes/admin.conf ]; then
-  echo "🔧 Initializing Kubernetes cluster..."
-  sudo /usr/bin/kubeadm init --pod-network-cidr=10.244.0.0/16 | tee /tmp/kubeadm-init.log
-fi
+  echo "🚀 Initializing Kubernetes control plane..."
+  sudo kubeadm init --pod-network-cidr=10.244.0.0/16
 
-# Configure kubectl for current user (assumes running as ubuntu)
-mkdir -p $HOME/.kube
-sudo cp -f /etc/kubernetes/admin.conf $HOME/.kube/config
-sudo chown $(id -u):$(id -g) $HOME/.kube/config
+  echo "🔧 Configuring kubeconfig..."
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
-# Install Flannel if not already installed
-if ! kubectl get pods -n kube-flannel &> /dev/null; then
-  echo "🌐 Installing Flannel CNI..."
+  echo "🌐 Applying Flannel CNI..."
   kubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml
+
+  echo "🔑 Creating permanent kubeadm join command..."
+  JOIN_CMD=$(kubeadm token create --ttl 0 --print-join-command)
+  echo "$JOIN_CMD" > /tmp/k8s_join.sh
+
+  echo "🔐 Uploading join command to AWS Secrets Manager..."
+  aws secretsmanager create-secret --name "$SECRET_NAME" \
+    --secret-string file:///tmp/k8s_join.sh \
+    --region "$AWS_REGION" || true
+
+  aws secretsmanager put-secret-value \
+    --secret-id "$SECRET_NAME" \
+    --secret-string file:///tmp/k8s_join.sh \
+    --region "$AWS_REGION"
+
+  echo "✅ Join command uploaded to AWS Secrets Manager."
+else
+  echo "✅ Kubernetes already initialized. Skipping init."
 fi
-
-# Wait for API server to be ready
-echo "⏳ Waiting for Kubernetes API server to be ready..."
-for i in {1..30}; do
-  if kubectl get nodes &> /dev/null; then
-    echo "✅ API server is up."
-    break
-  else
-    echo "Waiting for API server... ($i/30)"
-    sleep 5
-  fi
-done
-
-# Generate the join command
-echo "🔑 Generating kubeadm join command..."
-JOIN_COMMAND=$(kubeadm token create --print-join-command --ttl 24h)
-
-# Save the join command to a temp file
-echo "sudo $JOIN_COMMAND" > /tmp/k8s_join.sh
-
-# Store in AWS Secrets Manager
-echo "🔐 Saving join command in AWS Secrets Manager..."
-aws secretsmanager put-secret-value \
-  --secret-id deema-kubeadm-join-command \
-  --secret-string file:///tmp/k8s_join.sh \
-  --region us-west-1
-
-echo "✅ Join command saved to Secrets Manager."
