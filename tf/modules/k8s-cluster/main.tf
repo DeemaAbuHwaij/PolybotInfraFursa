@@ -415,3 +415,4 @@ resource "aws_security_group_rule" "allow_worker_to_worker_all" {
   source_security_group_id = aws_security_group.worker_sg.id
   description              = "Allow all traffic between worker nodes"
 }
+
