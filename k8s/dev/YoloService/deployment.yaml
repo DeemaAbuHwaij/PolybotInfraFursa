@@ -17,14 +17,26 @@ spec:
     spec:
       containers:
       - env:
-        - name: S3_BUCKET_NAME
-          value: alonit-bucket
-        - name: QUEUE_URL
-          value: alonit-queue
-        - name: POLYBOT_URL
-          value: polybot-dev-service
-        - name: STORAGE_TYPE
-          value: dynamodb
+          - name: POLYBOT_URL
+            valueFrom:
+              secretKeyRef:
+                name: yolo-secrets-dev
+                key: POLYBOT_URL
+          - name: S3_BUCKET_NAME
+            valueFrom:
+              secretKeyRef:
+                name: yolo-secrets-dev
+                key: S3_BUCKET_NAME
+          - name: QUEUE_URL
+            valueFrom:
+              secretKeyRef:
+                name: yolo-secrets-dev
+                key: QUEUE_URL
+          - name: STORAGE_TYPE
+            valueFrom:
+              secretKeyRef:
+                name: yolo-secrets-dev
+                key: STORAGE_TYPE
         image: deemaa/yolo-dev:74
         name: yolo-container
         resources:
@@ -34,3 +46,7 @@ spec:
           requests:
             cpu: 100m
             memory: 50Mi
+
+
+
+
