@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: polybot-dev
+  name: polybot-dev
+  namespace: dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: polybot-dev
+  template:
+    metadata:
+      labels:
+        app: polybot-dev
+    spec:
+      containers:
+        - image: deemaa/polybot-dev:118
+          name: polybot-container
+          env:
+            - name: TELEGRAM_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: polybot-secrets
+                  key: TELEGRAM_BOT_TOKEN
+            - name: S3_BUCKET_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: polybot-secrets
+                  key: S3_BUCKET_NAME
+            - name: QUEUE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: polybot-secrets
+                  key: QUEUE_URL
+            - name: NGINX_URL
+              valueFrom:
+                secretKeyRef:
+                  name: polybot-secrets
+                  key: NGINX_URL
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: polybot-dev-service
+  namespace: dev
+spec:
+  selector:
+    app: polybot-dev
+  ports:
+    - port: 8443         # Internal port (what Ingress sees)
+      targetPort: 8443   # Your app's container port

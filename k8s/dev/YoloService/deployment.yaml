@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: yolo-dev
+  name: yolo-dev
+  namespace: dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: yolo-dev
+  template:
+    metadata:
+      labels:
+        app: yolo-dev
+    spec:
+      containers:
+      - env:
+        - name: S3_BUCKET_NAME
+          value: alonit-bucket
+        - name: QUEUE_URL
+          value: alonit-queue
+        - name: POLYBOT_URL
+          value: polybot-dev-service
+        - name: STORAGE_TYPE
+          value: dynamodb
+        image: deemaa/yolo-dev:74
+        name: yolo-container
+        resources:
+          limits:
+            cpu: 100m
+            memory: 50Mi
+          requests:
+            cpu: 100m
+            memory: 50Mi
