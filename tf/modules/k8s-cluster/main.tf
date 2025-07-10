@@ -160,12 +160,16 @@ resource "aws_instance" "control_plane" {
   subnet_id                   = aws_subnet.public_subnets[0].id
   associate_public_ip_address = true
   vpc_security_group_ids      = [aws_security_group.control_plane_sg.id]
+
+  user_data = file("${path.module}/user_data_control_plane.sh")
+
   iam_instance_profile        = aws_iam_instance_profile.instance_profile.name
 
   tags = {
     Name = "k8s-deema-control-plane-${var.env}"
   }
 }
+
 
 
 
