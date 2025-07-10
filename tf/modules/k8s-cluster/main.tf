@@ -160,6 +160,9 @@ resource "aws_instance" "control_plane" {
   subnet_id                   = aws_subnet.public_subnets[0].id
   associate_public_ip_address = true
   vpc_security_group_ids      = [aws_security_group.control_plane_sg.id]
+
+  user_data = file("${path.module}/user_data_control_plane.sh")
+
   iam_instance_profile        = aws_iam_instance_profile.instance_profile.name
 
   tags = {
@@ -290,8 +293,12 @@ resource "aws_security_group" "lb_sg" {
   }
 }
 
-# ✅ Launch Template for Worker Nodes
-resource "aws_launch_template" "worker" {
+}
+
+
+
+# ✅ Launch Template for worker EC2 instances
+resource "aws_launch_template" "worker_lt" {
   name_prefix   = "k8s-worker"
   image_id      = var.ami_id
   instance_type = var.instance_type
@@ -301,34 +308,31 @@ resource "aws_launch_template" "worker" {
     name = aws_iam_instance_profile.worker_profile.name
   }
 
-  user_data = base64encode(file("${path.module}/user_data_worker.sh"))
-
   network_interfaces {
     associate_public_ip_address = true
-    security_groups = [
-      aws_security_group.control_plane_sg.id,
-      aws_security_group.worker_sg.id
-    ]
+    security_groups             = [aws_security_group.worker_sg.id]
   }
+
+  user_data = base64encode(file("${path.module}/user_data_worker.sh"))
 
   tag_specifications {
     resource_type = "instance"
-
     tags = {
-      Name = "k8s-worker"
+      Name = "k8s-worker-${var.env}"
+      Role = "worker"
     }
   }
 }
 
+
 # ✅ Auto Scaling Group for Worker Nodes
 resource "aws_autoscaling_group" "worker_asg" {
   name                      = "k8s-deema-worker-asg"
-  max_size                  = var.max_size
-  min_size                  = var.min_size
-  desired_capacity          = var.desired_capacity
-  health_check_type         = "EC2"
-  force_delete              = true
-  vpc_zone_identifier       = [for subnet in aws_subnet.public_subnets : subnet.id]
+  desired_capacity    = var.desired_capacity
+  max_size            = var.max_size
+  min_size            = var.min_size
+  vpc_zone_identifier = aws_subnet.public_subnets[*].id
+  health_check_type   = "EC2"
 
   launch_template {
     id      = aws_launch_template.worker.id
