@@ -365,7 +365,7 @@ resource "aws_lb" "k8s_lb" {
 
 # ✅ Target Group
 resource "aws_lb_target_group" "nginx_nodeport_tg" {
-  name        = "nginx-nodeport-tg"
+  name        = "nginx-nodeport-tg-${var.env}"
   port        = 32622
   protocol    = "HTTP"
   vpc_id      = aws_vpc.k8s_vpc.id
