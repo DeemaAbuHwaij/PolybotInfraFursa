@@ -1,9 +1,12 @@
+# PURPOSE: This workflow connects to the control plane EC2 instance,
+# initializes the Kubernetes cluster using kubeadm, and securely stores the join command in AWS Secrets Manager.
+
 name: Initialize Kubernetes Cluster
 
 on:
   workflow_dispatch:
 
-  workflow_run:
+  workflow_run:       # Auto-trigger after "Provision K8s Infrastructure" workflow finishes
     workflows: ["Provision K8s Infrastructure"]
     types:
       - completed
@@ -14,58 +17,38 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Connect via SSH and initialize Kubernetes
+      # Step 1: Connect to the control plane EC2 instance via SSH
+      - name: Connect via SSH and run kubeadm init, then save join command
         uses: appleboy/ssh-action@v0.1.10
         with:
           host: ${{ secrets.CONTROL_PLANE_IP }}
           username: ubuntu
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            set -e
-          
-            echo "🔧 Installing dependencies..."
-            sudo apt-get update -y
-            sudo apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release unzip software-properties-common
-          
-            echo "🐳 Installing containerd..."
-            sudo apt-get install -y containerd
-            sudo mkdir -p /etc/containerd
-            containerd config default | sudo tee /etc/containerd/config.toml > /dev/null
-            sudo systemctl restart containerd
-            sudo systemctl enable containerd
-          
-            echo "📦 Installing Kubernetes tools..."
-            sudo mkdir -p /etc/apt/keyrings
-            curl -fsSLo /etc/apt/keyrings/kubernetes-archive-keyring.gpg https://packages.cloud.google.com/apt/doc/apt-key.gpg
-            echo "deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-jammy main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
-            sudo apt-get update
-            sudo apt-get install -y kubelet kubeadm kubectl
-            sudo apt-mark hold kubelet kubeadm kubectl
-          
-            if [ ! -f /etc/kubernetes/admin.conf ]; then
-              echo "🚀 Initializing Kubernetes..."
-              sudo kubeadm init --pod-network-cidr=192.168.0.0/16 | tee /tmp/kubeadm-init.log
-            fi
-          
-            mkdir -p $HOME/.kube
-            sudo cp -f /etc/kubernetes/admin.conf $HOME/.kube/config
-            sudo chown $(id -u):$(id -g) $HOME/.kube/config
-          
-            echo "🌐 Installing Calico CNI..."
-            kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.2/manifests/calico.yaml
-          
-            echo "🔐 Installing AWS CLI if missing..."
+            echo "🔧 Running kubeadm init script..."
+
+            # Download and run the init script
+            curl -O https://raw.githubusercontent.com/DeemaAbuHwaij/PolybotInfraFursa/main/scripts/init_control_plane.sh
+            chmod +x init_control_plane.sh
+            ./init_control_plane.sh
+            
+            # Generate the join command and save it to a temp file
+            echo "sudo $(kubeadm token create --print-join-command)" > /tmp/k8s_join.sh
+
+            # Install AWS CLI if not already installed
             if ! command -v aws &> /dev/null; then
+              echo "Installing AWS CLI..."
               curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
               unzip -q awscliv2.zip
               sudo ./aws/install
             fi
-          
-            echo "🔑 Creating kubeadm join command..."
-            JOIN_CMD=$(kubeadm token create --print-join-command)
-          
-            echo "🔒 Saving join command to AWS Secrets Manager..."
+
+            # Store the join command in AWS Secrets Manager
+            aws secretsmanager create-secret \
+              --name deema-kubeadm-join-command \
+              --secret-string file:///tmp/k8s_join.sh \
+              --region us-west-1 || \
             aws secretsmanager put-secret-value \
               --secret-id deema-kubeadm-join-command \
-              --secret-string "$JOIN_CMD" \
+              --secret-string file:///tmp/k8s_join.sh \
               --region us-west-1
