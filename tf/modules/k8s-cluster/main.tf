@@ -379,6 +379,10 @@ resource "aws_lb_target_group" "nginx_nodeport_tg" {
     healthy_threshold   = 2
     unhealthy_threshold = 2
   }
+
+   lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # ✅ HTTPS Listener
