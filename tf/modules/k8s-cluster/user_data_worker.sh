@@ -1,9 +1,8 @@
 #!/bin/bash
-# PURPOSE: Install CRI-O and Kubernetes, then auto-join the cluster using systemd service that fetches join command from Secrets Manager
+# PURPOSE: Install CRI-O, Kubernetes components, and register a systemd service to join the cluster
 
 set -e
 
-# Variables
 KUBERNETES_VERSION=v1.32
 REGION="us-west-1"
 SECRET_ID="deema-kubeadm-join-command"
@@ -67,19 +66,19 @@ while true; do
     --output text 2>/dev/null)
 
   if [ -n "$JOIN_COMMAND" ]; then
-    echo "[INFO] Successfully retrieved join command. Executing..." | tee -a $LOG_FILE
+    echo "[INFO] Retrieved join command. Executing..." | tee -a $LOG_FILE
     eval "$JOIN_COMMAND" | tee -a $LOG_FILE
     break
   fi
 
-  echo "[WARN] Join command not available yet. Retrying in 15s..." | tee -a $LOG_FILE
+  echo "[WARN] Secret not available. Retrying in 15s..." | tee -a $LOG_FILE
   sleep 15
 done
 EOL
 
 chmod +x /usr/local/bin/join_cluster.sh
 
-echo "🔧 Creating systemd service for auto-join..."
+echo "🔧 Creating systemd service..."
 cat <<EOF | sudo tee /etc/systemd/system/k8s-join.service
 [Unit]
 Description=Join Kubernetes cluster
