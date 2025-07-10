@@ -71,3 +71,47 @@ fi
 
 echo "🤝 Joining the Kubernetes cluster..."
 eval "$JOIN_COMMAND"
+
+
+# Create a systemd service to run the join command at boot
+cat <<EOF | sudo tee /etc/systemd/system/k8s-join.service
+[Unit]
+Description=Join Kubernetes cluster
+After=network.target crio.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/join_cluster.sh
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Save your join logic into a script
+cat <<'EOL' | sudo tee /usr/local/bin/join_cluster.sh
+#!/bin/bash
+set -e
+REGION="us-west-1"
+SECRET_ID="deema-kubeadm-join-command"
+
+for attempt in {1..10}; do
+  JOIN_COMMAND=$(aws secretsmanager get-secret-value \
+    --region "$REGION" \
+    --secret-id "$SECRET_ID" \
+    --query SecretString \
+    --output text 2>/dev/null) && break
+  sleep 15
+done
+
+if [ -z "$JOIN_COMMAND" ]; then
+  echo "❌ Failed to fetch join command"
+  exit 1
+fi
+
+eval "$JOIN_COMMAND"
+EOL
+
+chmod +x /usr/local/bin/join_cluster.sh
+sudo systemctl daemon-reexec
+sudo systemctl enable --now k8s-join.service
