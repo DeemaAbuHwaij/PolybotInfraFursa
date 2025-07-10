@@ -254,8 +254,8 @@ resource "aws_security_group" "worker_sg" {
   }
 
   ingress {
-    from_port   = 31981
-    to_port     = 31981
+    from_port   = 32622
+    to_port     = 32622
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -366,7 +366,7 @@ resource "aws_lb" "k8s_lb" {
 # ✅ Target Group
 resource "aws_lb_target_group" "nginx_nodeport_tg" {
   name        = "nginx-nodeport-tg"
-  port        = 31981
+  port        = 32622
   protocol    = "HTTP"
   vpc_id      = aws_vpc.k8s_vpc.id
   target_type = "instance"
