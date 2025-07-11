@@ -24,6 +24,7 @@ resource "aws_subnet" "public_subnets" {
   vpc_id            = aws_vpc.k8s_vpc.id
   cidr_block        = cidrsubnet("10.0.0.0/16", 8, count.index)
   availability_zone = var.azs[count.index]
+  map_public_ip_on_launch = true  # ✅ Enables public IPs for EC2
   tags = {
     Name = "k8s-deema-public-subnet-${count.index}-${var.env}"
   }
