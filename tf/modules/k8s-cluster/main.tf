@@ -141,6 +141,30 @@ resource "aws_iam_role_policy_attachment" "worker_s3_put_attach" {
 }
 
 
+# ✅ SecretsManager Read Access for Worker Nodes (to get kubeadm join command)
+resource "aws_iam_policy" "worker_secretsmanager_read" {
+  name = "k8s-deema-worker-secrets-read-${var.env}"
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ],
+        Resource = "*"  # Optionally restrict to a specific secret ARN
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "worker_secretsmanager_read_attach" {
+  role       = aws_iam_role.worker_role.name
+  policy_arn = aws_iam_policy.worker_secretsmanager_read.arn
+}
+
+
 # ✅ Attach IAM Policies
 resource "aws_iam_role_policy_attachment" "ssm_attach" {
   role       = aws_iam_role.control_plane_role.name
@@ -162,10 +186,7 @@ resource "aws_iam_role_policy_attachment" "ddb_attach" {
   policy_arn = aws_iam_policy.yolo_dynamodb_policy.arn
 }
 
-resource "aws_iam_role_policy_attachment" "secrets_manager_access" {
-  role       = aws_iam_role.control_plane_role.name
-  policy_arn = "arn:aws:iam::aws:policy/SecretsManagerReadWrite"
-}
+
 
 # ✅ Instance Profiles
 resource "aws_iam_instance_profile" "instance_profile" {
