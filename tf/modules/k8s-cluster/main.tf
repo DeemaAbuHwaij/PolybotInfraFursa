@@ -118,6 +118,29 @@ resource "aws_iam_policy" "yolo_dynamodb_policy" {
   })
 }
 
+# ✅ S3 PutObject Policy for Worker Role (polybot upload fix)
+resource "aws_iam_policy" "worker_s3_put_policy" {
+  name   = "k8s-deema-worker-s3-put-policy-${var.env}"
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "s3:PutObject"
+        ],
+        Resource = "arn:aws:s3:::deema-polybot-dev-images/*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "worker_s3_put_attach" {
+  role       = aws_iam_role.worker_role.name
+  policy_arn = aws_iam_policy.worker_s3_put_policy.arn
+}
+
+
 # ✅ Attach IAM Policies
 resource "aws_iam_role_policy_attachment" "ssm_attach" {
   role       = aws_iam_role.control_plane_role.name
