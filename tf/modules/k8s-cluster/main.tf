@@ -162,6 +162,11 @@ resource "aws_iam_role_policy_attachment" "ddb_attach" {
   policy_arn = aws_iam_policy.yolo_dynamodb_policy.arn
 }
 
+resource "aws_iam_role_policy_attachment" "secrets_manager_access" {
+  role       = aws_iam_role.control_plane_role.name
+  policy_arn = "arn:aws:iam::aws:policy/SecretsManagerReadWrite"
+}
+
 # ✅ Instance Profiles
 resource "aws_iam_instance_profile" "instance_profile" {
   name = "k8s--deema-control-plane-profile"
@@ -448,4 +453,5 @@ resource "aws_security_group_rule" "allow_worker_to_worker_all" {
   source_security_group_id = aws_security_group.worker_sg.id
   description              = "Allow all traffic between worker nodes"
 }
+
 
