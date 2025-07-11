@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: yolo-prod
+  name: yolo-prod
+  namespace: prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: yolo-prod
+  template:
+    metadata:
+      labels:
+        app: yolo-prod
+    spec:
+      containers:
+      - env:
+          - name: POLYBOT_URL
+            valueFrom:
+              secretKeyRef:
+                name: yolo-secrets-prod
+                key: POLYBOT_URL
+          - name: S3_BUCKET_NAME
+            valueFrom:
+              secretKeyRef:
+                name: yolo-secrets-prod
+                key: S3_BUCKET_NAME
+          - name: QUEUE_URL
+            valueFrom:
+              secretKeyRef:
+                name: yolo-secrets-prod
+                key: QUEUE_URL
+          - name: STORAGE_TYPE
+            valueFrom:
+              secretKeyRef:
+                name: yolo-secrets-prod
+                key: STORAGE_TYPE
+        image: deemaa/yolo-prod:39
+        name: yolo-container
+        resources:
+          limits:
+            cpu: 100m
+            memory: 50Mi
+          requests:
+            cpu: 100m
+            memory: 50Mi
+
+
+
+
