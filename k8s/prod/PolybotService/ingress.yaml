@@ -6,7 +6,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-  - host: deema.polybot.fursa.click
+  - host: deema.polybot.prod.fursa.click
     http:
       paths:
       - path: /
