@@ -360,7 +360,7 @@ resource "aws_launch_template" "worker" {
     block_device_mappings {
     device_name = "/dev/xvda"  # Confirmed from your lsblk
     ebs {
-      volume_size = 20            # Change this value as needed (e.g., 20 GiB)
+      volume_size = 40            # Change this value as needed (e.g., 20 GiB)
       volume_type = "gp3"
       delete_on_termination = true
     }
