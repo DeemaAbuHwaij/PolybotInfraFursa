@@ -330,6 +330,15 @@ resource "aws_launch_template" "worker" {
 
   user_data = base64encode(file("${path.module}/user_data_worker.sh"))
 
+    block_device_mappings {
+    device_name = "/dev/nvme0n1"  # Confirmed from your lsblk
+    ebs {
+      volume_size = 20            # Change this value as needed (e.g., 20 GiB)
+      volume_type = "gp3"
+      delete_on_termination = true
+    }
+  }
+
   network_interfaces {
     associate_public_ip_address = true
     security_groups = [
@@ -346,6 +355,7 @@ resource "aws_launch_template" "worker" {
     }
   }
 }
+
 
 # ✅ Auto Scaling Group for Worker Nodes
 resource "aws_autoscaling_group" "worker_asg" {
