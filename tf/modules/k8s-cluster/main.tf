@@ -364,11 +364,11 @@ resource "aws_launch_template" "worker" {
 
   user_data = base64encode(file("${path.module}/user_data_worker.sh"))
 
-    block_device_mappings {
-    device_name = "/dev/xvda"  # Confirmed from your lsblk
+     block_device_mappings {
+    device_name = "/dev/sda1"
     ebs {
-      volume_size = 40            # Change this value as needed (e.g., 20 GiB)
-      volume_type = "gp3"
+      volume_size           = 20         # ✅ Increased root volume size
+      volume_type           = "gp3"
       delete_on_termination = true
     }
   }
