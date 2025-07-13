@@ -20,3 +20,4 @@ s3_bucket_name     = "deema-dev-bucket"
 sqs_queue_arn      = "arn:aws:sqs:us-west-1:228281126655:deema-polybot-chat-messages-dev"
 dynamodb_table_arn = "arn:aws:dynamodb:us-west-1:228281126655:table/deema-PolybotPredictions-dev"
 
+
