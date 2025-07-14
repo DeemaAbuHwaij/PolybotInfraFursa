@@ -1,0 +1,46 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: yolo-prometheus-rules
+  namespace: monitoring
+spec:
+  groups:
+    - name: yolo.rules
+      rules:
+        - alert: YoloHighResponseTime
+          expr: avg(rate(http_request_duration_seconds_sum{job="yolo-dev"}[1m])) 
+                / avg(rate(http_request_duration_seconds_count{job="yolo-dev"}[1m])) > 1
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: "⚠️ YOLO service in dev is slow"
+            description: "Average response time > 1s for 1 minute"
+
+        - alert: YoloServiceDown
+          expr: up{job="yolo-prod"} == 0
+          for: 30s
+          labels:
+            severity: critical
+          annotations:
+            summary: "❌ YOLO service in prod is down"
+            description: "No targets for yolo-prod responded in the last 30 seconds"
+
+        - alert: NodeHighCPUUsage
+          expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "🔥 High CPU usage"
+            description: "Node {{ $labels.instance }} CPU usage > 80% for 2 minutes"
+
+        - alert: NodeHighMemoryUsage
+          expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) 
+                / node_memory_MemTotal_bytes > 0.85
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "📈 High memory usage"
+            description: "Node {{ $labels.instance }} memory usage > 85% for 2 minutes"

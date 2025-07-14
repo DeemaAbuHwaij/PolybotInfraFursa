@@ -1,3 +1,4 @@
+# ConfigMap with Prometheus config
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -7,7 +8,101 @@ data:
   prometheus.yml: |
     global:
       scrape_interval: 15s
+    rule_files:
+      - /etc/prometheus/alerting-rules.yaml
     scrape_configs:
-      - job_name: 'kubernetes'
+      - job_name: 'prometheus'
         static_configs:
           - targets: ['localhost:9090']
+
+      - job_name: 'yolo-dev'
+        static_configs:
+          - targets: ['yolo-dev-service.dev.svc.cluster.local:8080']
+
+      - job_name: 'yolo-prod'
+        static_configs:
+          - targets: ['yolo-prod-service.prod.svc.cluster.local:8080']
+
+---
+# ConfigMap with alerting rules
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-alert-rules
+  namespace: monitoring
+data:
+  alerting-rules.yaml: |
+    groups:
+      - name: yolo.rules
+        rules:
+          - alert: YoloHighResponseTime
+            expr: http_request_duration_seconds_avg{job="yolo-dev"} > 1
+            for: 1m
+            labels:
+              severity: warning
+            annotations:
+              summary: "YOLO service in dev is slow"
+              description: "Average response time is > 1s for 1 minute."
+
+          - alert: NodeHighCPUUsage
+            expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High CPU usage"
+              description: "CPU usage on {{ $labels.instance }} is over 80%."
+
+---
+# Prometheus Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: monitoring
+spec:
+  selector:
+    app: prometheus
+  ports:
+    - protocol: TCP
+      port: 9090
+      targetPort: 9090
+
+---
+# Prometheus Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+        - name: prometheus
+          image: prom/prometheus
+          args:
+            - "--config.file=/etc/prometheus/prometheus.yml"
+          ports:
+            - containerPort: 9090
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/prometheus/prometheus.yml
+              subPath: prometheus.yml
+            - name: rules-volume
+              mountPath: /etc/prometheus/alerting-rules.yaml
+              subPath: alerting-rules.yaml
+      volumes:
+        - name: config-volume
+          configMap:
+            name: prometheus-config
+        - name: rules-volume
+          configMap:
+            name: prometheus-alert-rules
