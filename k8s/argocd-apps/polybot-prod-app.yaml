@@ -2,17 +2,19 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: polybot-prod
-  namespace: argocd
+  namespace: argocd   # Must be where ArgoCD is installed
 spec:
-  destination:
-    namespace: prod
-    server: https://kubernetes.default.svc
-  source:
-    path: k8s/Polybot
-    repoURL: https://github.com/DeemaAbuHwaij/PolybotInfraFursa
-    targetRevision: HEAD
   project: default
+  source:
+    repoURL: 'https://github.com/DeemaAbuHwaij/PolybotInfraFursa'
+    targetRevision: main
+    path: k8s/prod/PolybotService/
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: prod
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

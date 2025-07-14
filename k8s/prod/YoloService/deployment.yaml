@@ -1,0 +1,89 @@
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: yolo-prod
+  name: yolo-prod
+  namespace: prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: yolo-prod
+  template:
+    metadata:
+      labels:
+        app: yolo-prod
+    spec:
+      containers:
+        - name: yolo-container
+          image: deemaa/yolo-prod:39
+          env:
+            - name: POLYBOT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: yolo-secrets-prod
+                  key: POLYBOT_URL
+            - name: S3_BUCKET_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: yolo-secrets-prod
+                  key: S3_BUCKET_NAME
+            - name: QUEUE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: yolo-secrets-prod
+                  key: QUEUE_URL
+            - name: STORAGE_TYPE
+              valueFrom:
+                secretKeyRef:
+                  name: yolo-secrets-prod
+                  key: STORAGE_TYPE
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: yolo-service
+  namespace: prod
+  labels:
+    app: yolo-prod
+    monitoring: "true"
+spec:
+  selector:
+    app: yolo-prod
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+
+---
+# ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: yolo-service-monitor-prod
+  namespace: monitoring
+  labels:
+    release: prometheus  # must match your Prometheus Helm release
+spec:
+  selector:
+    matchLabels:
+      monitoring: "true"
+  namespaceSelector:
+    matchNames:
+      - prod
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s

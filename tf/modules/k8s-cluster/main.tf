@@ -6,7 +6,7 @@
 resource "aws_vpc" "k8s_vpc" {
   cidr_block = "10.0.0.0/16"
   tags = {
-    Name = "deema-k8s-vpc-${var.env}"
+    Name = "k8s-deema-vpc-${var.env}"
   }
 }
 
@@ -24,8 +24,9 @@ resource "aws_subnet" "public_subnets" {
   vpc_id            = aws_vpc.k8s_vpc.id
   cidr_block        = cidrsubnet("10.0.0.0/16", 8, count.index)
   availability_zone = var.azs[count.index]
+  map_public_ip_on_launch = true  # ✅ Enables public IPs for EC2
   tags = {
-    Name = "deema-public-subnet-${count.index}-${var.env}"
+    Name = "k8s-deema-public-subnet-${count.index}-${var.env}"
   }
 }
 
@@ -33,7 +34,7 @@ resource "aws_subnet" "public_subnets" {
 resource "aws_route_table" "public_rt" {
   vpc_id = aws_vpc.k8s_vpc.id
   tags = {
-    Name = "deema-public-rt-${var.env}"
+    Name = "k8s-deema-public-rt-${var.env}"
   }
 }
 
@@ -51,7 +52,7 @@ resource "aws_route_table_association" "public_assoc" {
 
 # ✅ IAM Role for EC2 - Control Plane
 resource "aws_iam_role" "control_plane_role" {
-  name = "deema-k8s-control-plane-role"
+  name = "k8s-deema-control-plane-role"
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
@@ -64,7 +65,7 @@ resource "aws_iam_role" "control_plane_role" {
 
 # ✅ IAM Role for EC2 - Worker
 resource "aws_iam_role" "worker_role" {
-  name = "deema-k8s-worker-role"
+  name = "k8s-deema-worker-role"
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
@@ -77,7 +78,7 @@ resource "aws_iam_role" "worker_role" {
 
 # ✅ Custom Policies
 resource "aws_iam_policy" "s3_bot_policy" {
-  name   = "deema-s3-bot-policy-${var.env}"
+  name   = "k8s-deema-s3-bot-policy-${var.env}"
   policy = jsonencode({
     Version = "2012-10-17",
     Statement = [
@@ -91,7 +92,7 @@ resource "aws_iam_policy" "s3_bot_policy" {
 }
 
 resource "aws_iam_policy" "yolo_sqs_policy" {
-  name   = "deema-sqs-policy-${var.env}"
+  name   = "k8s-deema-sqs-policy-${var.env}"
   policy = jsonencode({
     Version = "2012-10-17",
     Statement = [
@@ -105,7 +106,7 @@ resource "aws_iam_policy" "yolo_sqs_policy" {
 }
 
 resource "aws_iam_policy" "yolo_dynamodb_policy" {
-  name   = "deema-ddb-policy-${var.env}"
+  name   = "k8s-deema-ddb-policy-${var.env}"
   policy = jsonencode({
     Version = "2012-10-17",
     Statement = [
@@ -117,6 +118,62 @@ resource "aws_iam_policy" "yolo_dynamodb_policy" {
     ]
   })
 }
+
+# ✅ S3 PutObject Policy for Worker Role (polybot upload fix)
+resource "aws_iam_policy" "worker_s3_rw_policy" {
+  name   = "k8s-deema-worker-s3-rw-policy-${var.env}"
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject"
+        ],
+        Resource = "arn:aws:s3:::deema-polybot-dev-images/*"
+      },
+      {
+        Effect = "Allow",
+        Action = [
+          "s3:ListBucket"
+        ],
+        Resource = "arn:aws:s3:::deema-polybot-dev-images"
+      }
+    ]
+  })
+}
+
+
+resource "aws_iam_role_policy_attachment" "worker_s3_rw_attach" {
+  role       = aws_iam_role.worker_role.name
+  policy_arn = aws_iam_policy.worker_s3_rw_policy.arn
+}
+
+
+# ✅ SecretsManager Read Access for Worker Nodes (to get kubeadm join command)
+resource "aws_iam_policy" "worker_secretsmanager_read" {
+  name = "k8s-deema-worker-secrets-read-${var.env}"
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ],
+        Resource = "*"  # Optionally restrict to a specific secret ARN
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "worker_secretsmanager_read_attach" {
+  role       = aws_iam_role.worker_role.name
+  policy_arn = aws_iam_policy.worker_secretsmanager_read.arn
+}
+
 
 # ✅ Attach IAM Policies
 resource "aws_iam_role_policy_attachment" "ssm_attach" {
@@ -139,16 +196,20 @@ resource "aws_iam_role_policy_attachment" "ddb_attach" {
   policy_arn = aws_iam_policy.yolo_dynamodb_policy.arn
 }
 
+
+
 # ✅ Instance Profiles
 resource "aws_iam_instance_profile" "instance_profile" {
-  name = "deema-k8s-control-plane-profile"
+  name = "k8s--deema-control-plane-profile"
   role = aws_iam_role.control_plane_role.name
 }
 
 resource "aws_iam_instance_profile" "worker_profile" {
-  name = "deema-k8s-worker-profile"
+  name = "k8s--deema-worker-profile"
   role = aws_iam_role.worker_role.name
 }
+
+
 
 # ✅ EC2 Instance (Control Plane)
 resource "aws_instance" "control_plane" {
@@ -158,16 +219,33 @@ resource "aws_instance" "control_plane" {
   subnet_id                   = aws_subnet.public_subnets[0].id
   associate_public_ip_address = true
   vpc_security_group_ids      = [aws_security_group.control_plane_sg.id]
+
+  user_data = file("${path.module}/user_data_control_plane.sh")
+
   iam_instance_profile        = aws_iam_instance_profile.instance_profile.name
 
   tags = {
-    Name = "deema-control-plane-${var.env}"
+    Name = "k8s-deema-control-plane-${var.env}"
   }
 }
 
+
+
+
+# ✅ Elastic IP
+resource "aws_eip" "control_plane_eip" {
+  instance = aws_instance.control_plane.id
+  vpc      = true
+
+  tags = {
+    Name = "k8s-deema-control-plane-eip-${var.env}"
+  }
+}
+
+
 # ✅ Security Groups
 resource "aws_security_group" "control_plane_sg" {
-  name   = "control-plane-sg"
+  name   = "k8s-deema-control-plane-sg"
   vpc_id = aws_vpc.k8s_vpc.id
 
   lifecycle {
@@ -178,6 +256,20 @@ resource "aws_security_group" "control_plane_sg" {
   ingress {
     from_port   = 22
     to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 8443
+    to_port     = 8443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -219,8 +311,13 @@ resource "aws_security_group" "control_plane_sg" {
 }
 
 resource "aws_security_group" "worker_sg" {
-  name   = "worker-sg"
+  name   = "k8s-deema-worker-sg"
   vpc_id = aws_vpc.k8s_vpc.id
+
+  lifecycle {
+  create_before_destroy = true
+  }
+
 
   ingress {
     from_port   = 22
@@ -230,8 +327,8 @@ resource "aws_security_group" "worker_sg" {
   }
 
   ingress {
-    from_port   = 31981
-    to_port     = 31981
+    from_port   = 32622
+    to_port     = 32622
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -252,7 +349,7 @@ resource "aws_security_group" "worker_sg" {
 }
 
 resource "aws_security_group" "lb_sg" {
-  name   = "lb-sg"
+  name   = "k8s-deema-lb-sg"
   vpc_id = aws_vpc.k8s_vpc.id
 
   ingress {
@@ -268,4 +365,134 @@ resource "aws_security_group" "lb_sg" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+}
+
+# ✅ Launch Template for Worker Nodes
+resource "aws_launch_template" "worker" {
+  name_prefix   = "k8s-worker"
+  image_id      = var.ami_id
+  instance_type = var.instance_type
+  key_name      = var.key_name
+
+  iam_instance_profile {
+    name = aws_iam_instance_profile.worker_profile.name
+  }
+
+  user_data = base64encode(file("${path.module}/user_data_worker.sh"))
+
+     block_device_mappings {
+    device_name = "/dev/sda1"
+    ebs {
+      volume_size           = 20         # ✅ Increased root volume size
+      volume_type           = "gp3"
+      delete_on_termination = true
+    }
+  }
+
+  vpc_security_group_ids = [
+  aws_security_group.control_plane_sg.id,
+  aws_security_group.worker_sg.id
+  ]
+
+
+  tag_specifications {
+    resource_type = "instance"
+
+    tags = {
+      Name = "k8s-worker"
+    }
+  }
+}
+
+
+# ✅ Auto Scaling Group for Worker Nodes
+resource "aws_autoscaling_group" "worker_asg" {
+  name                      = "k8s-deema-worker-asg"
+  max_size                  = var.max_size
+  min_size                  = var.min_size
+  desired_capacity          = var.desired_capacity
+  health_check_type         = "EC2"
+  force_delete              = true
+  vpc_zone_identifier       = [for subnet in aws_subnet.public_subnets : subnet.id]
+
+  launch_template {
+    id      = aws_launch_template.worker.id
+    version = "$Latest"
+  }
+
+  tag {
+    key                 = "Name"
+    value               = "k8s-worker"
+    propagate_at_launch = true
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# ✅ Load Balancer
+resource "aws_lb" "k8s_lb" {
+  name               = "k8s-lb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.lb_sg.id]
+  subnets            = [for subnet in aws_subnet.public_subnets : subnet.id]
+
+  tags = {
+    Name = "k8s-lb"
+  }
+}
+
+# ✅ Target Group
+resource "aws_lb_target_group" "nginx_nodeport_tg" {
+  name        = "deema-nginx-nodeport-tg-${var.env}"
+  port        = 30216
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.k8s_vpc.id
+  target_type = "instance"
+
+  health_check {
+    path                = "/healthz"
+    matcher             = "200-399"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
+
+   lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# ✅ HTTPS Listener
+resource "aws_lb_listener" "https_listener" {
+  load_balancer_arn = aws_lb.k8s_lb.arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-2016-08"
+  certificate_arn   = var.acm_cert_arn
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.nginx_nodeport_tg.arn
+  }
+}
+
+# ✅ Attach Worker ASG to LB Target Group
+resource "aws_autoscaling_attachment" "nginx_asg_lb_attachment" {
+  autoscaling_group_name = aws_autoscaling_group.worker_asg.name
+  lb_target_group_arn    = aws_lb_target_group.nginx_nodeport_tg.arn
+}
+
+# ✅ Allow Worker-to-Worker Communication
+resource "aws_security_group_rule" "allow_worker_to_worker_all" {
+  type                     = "ingress"
+  from_port                = 0
+  to_port                  = 0
+  protocol                 = "-1"
+  security_group_id        = aws_security_group.worker_sg.id
+  source_security_group_id = aws_security_group.worker_sg.id
+  description              = "Allow all traffic between worker nodes"
 }
