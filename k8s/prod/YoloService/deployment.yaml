@@ -41,12 +41,13 @@ spec:
                   name: yolo-secrets-prod
                   key: STORAGE_TYPE
           resources:
-            limits:
-              cpu: 100m
-              memory: 50Mi
             requests:
-              cpu: 100m
-              memory: 50Mi
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
 
 ---
 # Service
