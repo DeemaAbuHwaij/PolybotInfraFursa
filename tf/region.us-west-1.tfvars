@@ -5,8 +5,8 @@ instance_type = "t3.medium"
 key_name      = "DeemaKey"
 vpc_cidr      = "10.0.0.0/16"
 azs           = ["us-west-1a", "us-west-1b"]
-desired_capacity = 2
-min_size         = 2
+desired_capacity = 0
+min_size         = 0
 max_size         = 3
 
 # Required if your module expects public_subnets
