@@ -34,6 +34,11 @@ spec:
                 secretKeyRef:
                   name: yolo-secrets-dev
                   key: SQS_QUEUE_URL
+            - name: AWS_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: yolo-secrets-dev
+                  key: AWS_REGION
             - name: STORAGE_TYPE
               valueFrom:
                 secretKeyRef:
