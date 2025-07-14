@@ -29,11 +29,11 @@ spec:
                 secretKeyRef:
                   name: yolo-secrets-dev
                   key: S3_BUCKET_NAME
-            - name: QUEUE_URL
+            - name: SQS_QUEUE_URL
               valueFrom:
                 secretKeyRef:
                   name: yolo-secrets-dev
-                  key: QUEUE_URL
+                  key: SQS_QUEUE_URL
             - name: STORAGE_TYPE
               valueFrom:
                 secretKeyRef:
